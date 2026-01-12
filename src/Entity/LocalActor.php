@@ -32,6 +32,9 @@ class LocalActor
     #[ORM\Column]
     private int $y;
 
+    #[ORM\Column(options: ['default' => 0])]
+    private int $turnMeter = 0;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -84,6 +87,19 @@ class LocalActor
     public function getY(): int
     {
         return $this->y;
+    }
+    public function getTurnMeter(): int
+    {
+        return $this->turnMeter;
+    }
+
+    public function setTurnMeter(int $turnMeter): void
+    {
+        if ($turnMeter < 0) {
+            throw new \InvalidArgumentException('turnMeter must be >= 0.');
+        }
+
+        $this->turnMeter = $turnMeter;
     }
 
     public function setPosition(int $x, int $y): void
