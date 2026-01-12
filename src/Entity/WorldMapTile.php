@@ -32,6 +32,9 @@ class WorldMapTile
     #[ORM\Column(options: ['default' => false])]
     private bool $hasSettlement = false;
 
+    #[ORM\Column(options: ['default' => false])]
+    private bool $hasDojo = false;
+
     public function __construct(World $world, int $x, int $y, Biome $biome)
     {
         if ($x < 0 || $y < 0) {
@@ -83,5 +86,14 @@ class WorldMapTile
     {
         $this->hasSettlement = $hasSettlement;
     }
-}
 
+    public function hasDojo(): bool
+    {
+        return $this->hasDojo;
+    }
+
+    public function setHasDojo(bool $hasDojo): void
+    {
+        $this->hasDojo = $hasDojo;
+    }
+}

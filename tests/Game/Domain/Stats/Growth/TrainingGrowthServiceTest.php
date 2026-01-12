@@ -19,5 +19,15 @@ final class TrainingGrowthServiceTest extends TestCase
         self::assertGreaterThan($before->strength, $after->strength);
         self::assertGreaterThan($before->kiControl, $after->kiControl);
     }
-}
 
+    public function testTrainingMultiplierAffectsGrowth(): void
+    {
+        $service = new TrainingGrowthService();
+        $before  = CoreAttributes::baseline();
+
+        $wilderness = $service->trainWithMultiplier($before, TrainingIntensity::Normal, 1.0);
+        $dojo       = $service->trainWithMultiplier($before, TrainingIntensity::Normal, 1.25);
+
+        self::assertGreaterThan($wilderness->strength, $dojo->strength);
+    }
+}

@@ -8,7 +8,19 @@ final class TrainingGrowthService
 {
     public function train(CoreAttributes $before, TrainingIntensity $intensity): CoreAttributes
     {
-        return $before->withDelta($this->deltaFor($intensity));
+        return $this->trainWithMultiplier($before, $intensity, 1.0);
+    }
+
+    public function trainWithMultiplier(CoreAttributes $before, TrainingIntensity $intensity, float $multiplier): CoreAttributes
+    {
+        if ($multiplier <= 0) {
+            throw new \InvalidArgumentException('Multiplier must be > 0.');
+        }
+
+        $delta  = $this->deltaFor($intensity);
+        $scaled = $this->scale($delta, $multiplier);
+
+        return $before->withDelta($scaled);
     }
 
     public function trainWithResult(CoreAttributes $before, TrainingIntensity $intensity): TrainingResult
@@ -40,5 +52,22 @@ final class TrainingGrowthService
             adaptability: $delta,
         );
     }
-}
 
+    private function scale(CoreAttributes $delta, float $multiplier): CoreAttributes
+    {
+        $scale = static fn(int $value): int => max(0, (int)ceil($value * $multiplier));
+
+        return new CoreAttributes(
+            strength: $scale($delta->strength),
+            speed: $scale($delta->speed),
+            endurance: $scale($delta->endurance),
+            durability: $scale($delta->durability),
+            kiCapacity: $scale($delta->kiCapacity),
+            kiControl: $scale($delta->kiControl),
+            kiRecovery: $scale($delta->kiRecovery),
+            focus: $scale($delta->focus),
+            discipline: $scale($delta->discipline),
+            adaptability: $scale($delta->adaptability),
+        );
+    }
+}
