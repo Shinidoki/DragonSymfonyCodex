@@ -19,6 +19,15 @@ class World
     #[ORM\Column(length: 128)]
     private string $seed;
 
+    #[ORM\Column(length: 64)]
+    private string $planetName = 'Earth';
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $width = 0;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $height = 0;
+
     #[ORM\Column]
     private int $currentDay = 0;
 
@@ -46,6 +55,41 @@ class World
     public function getSeed(): string
     {
         return $this->seed;
+    }
+
+    public function getPlanetName(): string
+    {
+        return $this->planetName;
+    }
+
+    public function setPlanetName(string $planetName): void
+    {
+        $planetName = trim($planetName);
+        if ($planetName === '') {
+            throw new \InvalidArgumentException('Planet name must not be empty.');
+        }
+
+        $this->planetName = $planetName;
+    }
+
+    public function getWidth(): int
+    {
+        return $this->width;
+    }
+
+    public function getHeight(): int
+    {
+        return $this->height;
+    }
+
+    public function setMapSize(int $width, int $height): void
+    {
+        if ($width < 0 || $height < 0) {
+            throw new \InvalidArgumentException('Map size must be >= 0.');
+        }
+
+        $this->width  = $width;
+        $this->height = $height;
     }
 
     public function getCurrentDay(): int
@@ -84,4 +128,3 @@ class World
         $this->characters->add($character);
     }
 }
-

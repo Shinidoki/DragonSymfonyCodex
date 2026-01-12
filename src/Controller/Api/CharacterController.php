@@ -23,6 +23,10 @@ final class CharacterController extends AbstractController
             'name'         => $character->getName(),
             'race'         => $character->getRace()->value,
             'ageDays'      => $character->getAgeDays(),
+            'tileX'       => $character->getTileX(),
+            'tileY'       => $character->getTileY(),
+            'targetTileX' => $character->getTargetTileX(),
+            'targetTileY' => $character->getTargetTileY(),
             'strength'     => $character->getStrength(),
             'speed'        => $character->getSpeed(),
             'endurance'    => $character->getEndurance(),
@@ -37,4 +41,3 @@ final class CharacterController extends AbstractController
         ]);
     }
 }
-

@@ -30,6 +30,18 @@ class Character
     #[ORM\Column]
     private int $ageDays = 0;
 
+    #[ORM\Column(options: ['default' => 0])]
+    private int $tileX = 0;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $tileY = 0;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $targetTileX = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $targetTileY = null;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -96,6 +108,57 @@ class Character
     public function getAgeDays(): int
     {
         return $this->ageDays;
+    }
+
+    public function getTileX(): int
+    {
+        return $this->tileX;
+    }
+
+    public function getTileY(): int
+    {
+        return $this->tileY;
+    }
+
+    public function setTilePosition(int $x, int $y): void
+    {
+        if ($x < 0 || $y < 0) {
+            throw new \InvalidArgumentException('Tile coordinates must be >= 0.');
+        }
+
+        $this->tileX = $x;
+        $this->tileY = $y;
+    }
+
+    public function hasTravelTarget(): bool
+    {
+        return $this->targetTileX !== null && $this->targetTileY !== null;
+    }
+
+    public function getTargetTileX(): ?int
+    {
+        return $this->targetTileX;
+    }
+
+    public function getTargetTileY(): ?int
+    {
+        return $this->targetTileY;
+    }
+
+    public function setTravelTarget(int $x, int $y): void
+    {
+        if ($x < 0 || $y < 0) {
+            throw new \InvalidArgumentException('Travel target coordinates must be >= 0.');
+        }
+
+        $this->targetTileX = $x;
+        $this->targetTileY = $y;
+    }
+
+    public function clearTravelTarget(): void
+    {
+        $this->targetTileX = null;
+        $this->targetTileY = null;
     }
 
     public function advanceDays(int $days): void

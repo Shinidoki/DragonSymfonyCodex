@@ -47,4 +47,38 @@ final class AdvanceDayHandlerTest extends TestCase
         self::assertSame(1, $result->world->getCurrentDay());
         self::assertGreaterThan($beforeStrength, $character->getStrength());
     }
+
+    public function testAdvanceMovesTravelingCharacterInsteadOfTraining(): void
+    {
+        $world     = new World('seed-1');
+        $character = new Character($world, 'Bulma', Race::Human);
+        $character->setTravelTarget(1, 0);
+
+        $worldRepository = $this->createMock(WorldRepository::class);
+        $worldRepository->expects(self::once())
+            ->method('find')
+            ->with(1)
+            ->willReturn($world);
+
+        $characterRepository = $this->createMock(CharacterRepository::class);
+        $characterRepository->expects(self::once())
+            ->method('findBy')
+            ->with(['world' => $world])
+            ->willReturn([$character]);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::once())->method('flush');
+
+        $clock   = new SimulationClock(new TrainingGrowthService());
+        $handler = new AdvanceDayHandler($worldRepository, $characterRepository, $clock, $entityManager);
+
+        $beforeStrength = $character->getStrength();
+
+        $handler->advance(1, 1);
+
+        self::assertSame(1, $character->getTileX());
+        self::assertSame(0, $character->getTileY());
+        self::assertFalse($character->hasTravelTarget());
+        self::assertSame($beforeStrength, $character->getStrength());
+    }
 }

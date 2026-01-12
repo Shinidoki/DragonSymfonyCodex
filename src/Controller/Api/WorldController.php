@@ -20,9 +20,11 @@ final class WorldController extends AbstractController
         return $this->json([
             'id'         => $world->getId(),
             'seed'       => $world->getSeed(),
+            'planetName' => $world->getPlanetName(),
+            'width'      => $world->getWidth(),
+            'height'     => $world->getHeight(),
             'currentDay' => $world->getCurrentDay(),
             'createdAt'  => $world->getCreatedAt()->format(\DateTimeInterface::ATOM),
         ]);
     }
 }
-
