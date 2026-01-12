@@ -17,41 +17,25 @@ final class LocalNpcTickRunner
     }
 
     /**
-     * MVP: advance each NPC actor by at most one tick action.
+     * Apply at most one tick action for this NPC actor.
+     *
+     * Tick incrementing is handled by the caller (e.g. LocalTurnEngine).
      */
-    public function advanceNpcTurns(LocalSession $session): void
+    public function applyNpcTurn(LocalSession $session, LocalActor $npc, LocalActor $playerActor): void
     {
         if (!$session->isActive()) {
             return;
         }
 
-        $playerActor = $this->entityManager->getRepository(LocalActor::class)->findOneBy([
-            'session' => $session,
-            'role'    => 'player',
-        ]);
-        if (!$playerActor instanceof LocalActor) {
+        $intent = $this->entityManager->getRepository(LocalIntent::class)->findOneBy(
+            ['actor' => $npc],
+            ['id' => 'DESC'],
+        );
+        if (!$intent instanceof LocalIntent) {
             return;
         }
 
-        /** @var list<LocalActor> $npcs */
-        $npcs = $this->entityManager->getRepository(LocalActor::class)->findBy(
-            ['session' => $session, 'role' => 'npc'],
-            ['id' => 'ASC'],
-        );
-
-        foreach ($npcs as $npc) {
-            $intent = $this->entityManager->getRepository(LocalIntent::class)->findOneBy(
-                ['actor' => $npc],
-                ['id' => 'DESC'],
-            );
-            if (!$intent instanceof LocalIntent) {
-                continue;
-            }
-
-            $this->applyIntent($session, $npc, $playerActor, $intent);
-        }
-
-        $this->entityManager->flush();
+        $this->applyIntent($session, $npc, $playerActor, $intent);
     }
 
     private function applyIntent(LocalSession $session, LocalActor $npc, LocalActor $playerActor, LocalIntent $intent): void
@@ -73,7 +57,6 @@ final class LocalNpcTickRunner
         $distance = abs($npc->getX() - $target->getX()) + abs($npc->getY() - $target->getY());
 
         if (($type === IntentType::TalkTo || $type === IntentType::Attack) && $distance <= 1) {
-            $session->incrementTick();
             $this->recordProximityEvent($session, $npc, $playerActor, $type, $target);
             $this->entityManager->remove($intent);
             return;
@@ -81,8 +64,8 @@ final class LocalNpcTickRunner
 
         if ($type === IntentType::MoveTo || $type === IntentType::TalkTo || $type === IntentType::Attack) {
             $next = $this->stepToward($npc->getX(), $npc->getY(), $target->getX(), $target->getY());
+            $next = $this->clampToMap($session, $next['x'], $next['y']);
             $npc->setPosition($next['x'], $next['y']);
-            $session->incrementTick();
         }
     }
 
@@ -93,13 +76,24 @@ final class LocalNpcTickRunner
     {
         if ($x !== $targetX) {
             $dx = $x < $targetX ? 1 : -1;
-            return ['x' => max(0, $x + $dx), 'y' => $y];
+            return ['x' => $x + $dx, 'y' => $y];
         }
 
         if ($y !== $targetY) {
             $dy = $y < $targetY ? 1 : -1;
-            return ['x' => $x, 'y' => max(0, $y + $dy)];
+            return ['x' => $x, 'y' => $y + $dy];
         }
+
+        return ['x' => $x, 'y' => $y];
+    }
+
+    /**
+     * @return array{x:int,y:int}
+     */
+    private function clampToMap(LocalSession $session, int $x, int $y): array
+    {
+        $x = max(0, min($session->getWidth() - 1, $x));
+        $y = max(0, min($session->getHeight() - 1, $y));
 
         return ['x' => $x, 'y' => $y];
     }
@@ -138,4 +132,3 @@ final class LocalNpcTickRunner
         return sprintf('Character#%d', $characterId);
     }
 }
-
