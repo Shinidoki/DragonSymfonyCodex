@@ -4,12 +4,16 @@ namespace App\Game\Application\Local;
 
 use App\Entity\Character;
 use App\Entity\LocalActor;
+use App\Entity\LocalCombat;
+use App\Entity\LocalCombatant;
 use App\Entity\LocalSession;
+use App\Game\Application\Local\Combat\CombatResolver;
 use App\Game\Domain\LocalMap\LocalAction;
 use App\Game\Domain\LocalMap\LocalActionType;
 use App\Game\Domain\LocalMap\LocalCoord;
 use App\Game\Domain\LocalMap\LocalMapSize;
 use App\Game\Domain\LocalMap\LocalMovement;
+use App\Game\Domain\LocalMap\VisibilityRadius;
 use App\Game\Domain\LocalTurns\TurnScheduler;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -46,39 +50,35 @@ final class LocalTurnEngine
             throw new \RuntimeException('Local session has no player actor.');
         }
 
-        $state = $this->buildTurnState($actors);
-
         // Advance NPC actions until the player is next to act.
-        while ($this->peekNextActorId($state) !== (int)$playerActor->getId()) {
-            $this->executeNextNpcAction($session, $actors, $state, $playerActor);
+        while ($this->peekNextActorId($session, $actors) !== (int)$playerActor->getId()) {
+            $this->executeNextNpcAction($session, $actors, $playerActor);
         }
 
         // Consume the player turn.
-        $next = $this->scheduler->pickNextActorId($state);
+        $next = $this->consumeNextActorId($session, $actors);
         if ($next !== (int)$playerActor->getId()) {
             throw new \LogicException('Expected player to be next to act.');
         }
-        $this->syncTurnMeters($actors, $state);
 
         $this->incrementTick($session);
-        $this->applyPlayerLocalAction($session, $playerAction);
+        $this->applyPlayerLocalAction($session, $playerActor, $playerAction);
         $playerActor->setPosition($session->getPlayerX(), $session->getPlayerY());
 
         // Advance NPC actions until the player is next to act again.
-        while ($this->peekNextActorId($state) !== (int)$playerActor->getId()) {
-            $this->executeNextNpcAction($session, $actors, $state, $playerActor);
+        while ($this->peekNextActorId($session, $actors) !== (int)$playerActor->getId()) {
+            $this->executeNextNpcAction($session, $actors, $playerActor);
         }
-
-        // Persist final turn meters even if we stopped on a peek.
-        $this->syncTurnMeters($actors, $state);
     }
 
     /**
      * @param list<LocalActor> $actors
      * @return array<int,array{id:int,speed:int,meter:int}>
      */
-    private function buildTurnState(array $actors): array
+    private function buildTurnState(LocalSession $session, array $actors): array
     {
+        $defeatedActorIds = $this->findDefeatedActorIds($session);
+
         $characterIds = array_values(array_unique(array_map(static fn (LocalActor $a): int => $a->getCharacterId(), $actors)));
 
         $charactersById = [];
@@ -92,6 +92,10 @@ final class LocalTurnEngine
 
         $state = [];
         foreach ($actors as $actor) {
+            if (isset($defeatedActorIds[(int)$actor->getId()])) {
+                continue;
+            }
+
             $speed = 1;
             $character = $charactersById[$actor->getCharacterId()] ?? null;
             if ($character instanceof Character) {
@@ -109,22 +113,21 @@ final class LocalTurnEngine
     }
 
     /**
-     * @param array<int,array{id:int,speed:int,meter:int}> $state
+     * @param list<LocalActor> $actors
      */
-    private function peekNextActorId(array $state): int
+    private function peekNextActorId(LocalSession $session, array $actors): int
     {
-        $copy = $state;
+        $state = $this->buildTurnState($session, $actors);
+        $copy  = $state;
         return $this->scheduler->pickNextActorId($copy);
     }
 
     /**
      * @param list<LocalActor> $actors
-     * @param array<int,array{id:int,speed:int,meter:int}> $state
      */
-    private function executeNextNpcAction(LocalSession $session, array $actors, array &$state, LocalActor $playerActor): void
+    private function executeNextNpcAction(LocalSession $session, array $actors, LocalActor $playerActor): void
     {
-        $nextId = $this->scheduler->pickNextActorId($state);
-        $this->syncTurnMeters($actors, $state);
+        $nextId = $this->consumeNextActorId($session, $actors);
 
         $nextActor = $this->findActorById($actors, $nextId);
         if (!$nextActor instanceof LocalActor) {
@@ -173,20 +176,106 @@ final class LocalTurnEngine
         }
     }
 
-    private function applyPlayerLocalAction(LocalSession $session, LocalAction $action): void
+    /**
+     * @param list<LocalActor> $actors
+     */
+    private function consumeNextActorId(LocalSession $session, array $actors): int
     {
-        if ($action->type !== LocalActionType::Move) {
+        $state = $this->buildTurnState($session, $actors);
+        $next  = $this->scheduler->pickNextActorId($state);
+        $this->syncTurnMeters($actors, $state);
+        return $next;
+    }
+
+    private function applyPlayerLocalAction(LocalSession $session, LocalActor $playerActor, LocalAction $action): void
+    {
+        if ($action->type === LocalActionType::Wait) {
             return;
         }
 
-        $current = new LocalCoord($session->getPlayerX(), $session->getPlayerY());
-        $size    = new LocalMapSize($session->getWidth(), $session->getHeight());
-        $next    = $this->movement->move($current, $action->direction, $size);
-        $session->setPlayerPosition($next->x, $next->y);
+        if ($action->type === LocalActionType::Move) {
+            $current = new LocalCoord($session->getPlayerX(), $session->getPlayerY());
+            $size    = new LocalMapSize($session->getWidth(), $session->getHeight());
+            $next    = $this->movement->move($current, $action->direction, $size);
+            $session->setPlayerPosition($next->x, $next->y);
+            return;
+        }
+
+        if ($action->type === LocalActionType::Talk) {
+            $target = $action->targetActorId !== null
+                ? $this->entityManager->find(LocalActor::class, $action->targetActorId)
+                : null;
+
+            if (!$target instanceof LocalActor || (int)$target->getSession()->getId() !== (int)$session->getId()) {
+                (new LocalEventLog($this->entityManager))->record($session, $playerActor->getX(), $playerActor->getY(), 'No valid target.', new VisibilityRadius(2));
+                return;
+            }
+
+            $distance = abs($playerActor->getX() - $target->getX()) + abs($playerActor->getY() - $target->getY());
+            if ($distance > 1) {
+                (new LocalEventLog($this->entityManager))->record($session, $playerActor->getX(), $playerActor->getY(), 'Target is too far away.', new VisibilityRadius(2));
+                return;
+            }
+
+            $playerName = $this->characterName($playerActor->getCharacterId());
+            $targetName = $this->characterName($target->getCharacterId());
+            (new LocalEventLog($this->entityManager))->record(
+                $session,
+                $playerActor->getX(),
+                $playerActor->getY(),
+                sprintf('%s talks to %s.', $playerName, $targetName),
+                new VisibilityRadius(2),
+            );
+            return;
+        }
+
+        if ($action->type === LocalActionType::Attack) {
+            if ($action->targetActorId === null) {
+                throw new \InvalidArgumentException('Attack action requires a target actor id.');
+            }
+
+            (new CombatResolver($this->entityManager))->attack($session, $playerActor, $action->targetActorId);
+            return;
+        }
+
+        throw new \LogicException(sprintf('Unsupported local action type: %s', $action->type->value));
     }
 
     private function incrementTick(LocalSession $session): void
     {
         $session->incrementTick();
+    }
+
+    /**
+     * @return array<int,true>
+     */
+    private function findDefeatedActorIds(LocalSession $session): array
+    {
+        $combat = $this->entityManager->getRepository(LocalCombat::class)->findOneBy(['session' => $session]);
+        if (!$combat instanceof LocalCombat) {
+            return [];
+        }
+
+        /** @var list<LocalCombatant> $combatants */
+        $combatants = $this->entityManager->getRepository(LocalCombatant::class)->findBy(['combat' => $combat]);
+
+        $defeated = [];
+        foreach ($combatants as $combatant) {
+            if ($combatant->isDefeated()) {
+                $defeated[$combatant->getActorId()] = true;
+            }
+        }
+
+        return $defeated;
+    }
+
+    private function characterName(int $characterId): string
+    {
+        $character = $this->entityManager->find(Character::class, $characterId);
+        if ($character instanceof Character) {
+            return $character->getName();
+        }
+
+        return sprintf('Character#%d', $characterId);
     }
 }

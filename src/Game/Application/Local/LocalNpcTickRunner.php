@@ -7,6 +7,7 @@ use App\Entity\LocalActor;
 use App\Entity\LocalEvent;
 use App\Entity\LocalIntent;
 use App\Entity\LocalSession;
+use App\Game\Application\Local\Combat\CombatResolver;
 use App\Game\Domain\LocalNpc\IntentType;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -56,9 +57,14 @@ final class LocalNpcTickRunner
 
         $distance = abs($npc->getX() - $target->getX()) + abs($npc->getY() - $target->getY());
 
-        if (($type === IntentType::TalkTo || $type === IntentType::Attack) && $distance <= 1) {
+        if ($type === IntentType::TalkTo && $distance <= 1) {
             $this->recordProximityEvent($session, $npc, $playerActor, $type, $target);
             $this->entityManager->remove($intent);
+            return;
+        }
+
+        if ($type === IntentType::Attack && $distance <= 1) {
+            (new CombatResolver($this->entityManager))->attack($session, $npc, (int)$target->getId());
             return;
         }
 

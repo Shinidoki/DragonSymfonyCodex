@@ -1,0 +1,138 @@
+<?php
+
+namespace App\Game\Application\Local\Combat;
+
+use App\Entity\Character;
+use App\Entity\LocalActor;
+use App\Entity\LocalCombat;
+use App\Entity\LocalCombatant;
+use App\Entity\LocalSession;
+use App\Game\Application\Local\LocalEventLog;
+use App\Game\Domain\LocalMap\VisibilityRadius;
+use Doctrine\ORM\EntityManagerInterface;
+
+final class CombatResolver
+{
+    public function __construct(private readonly EntityManagerInterface $entityManager)
+    {
+    }
+
+    public function attack(LocalSession $session, LocalActor $attacker, int $targetActorId): void
+    {
+        $target = $this->entityManager->find(LocalActor::class, $targetActorId);
+        if (!$target instanceof LocalActor || (int)$target->getSession()->getId() !== (int)$session->getId()) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No valid target.');
+            return;
+        }
+
+        $distance = abs($attacker->getX() - $target->getX()) + abs($attacker->getY() - $target->getY());
+        if ($distance > 1) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Target is too far away.');
+            return;
+        }
+
+        $combat            = $this->getOrCreateCombat($session);
+        $attackerCombatant = $this->getOrCreateCombatant($combat, $attacker);
+        $defenderCombatant = $this->getOrCreateCombatant($combat, $target);
+
+        $damage = $this->damagePerHit($attacker, $target);
+        $defenderCombatant->applyDamage($damage, $session->getCurrentTick());
+
+        $attackerName = $this->characterName($attacker->getCharacterId());
+        $defenderName = $this->characterName($target->getCharacterId());
+
+        $this->recordEvent(
+            $session,
+            $attacker->getX(),
+            $attacker->getY(),
+            sprintf('%s attacks %s for %d damage.', $attackerName, $defenderName, $damage),
+        );
+
+        if ($defenderCombatant->isDefeated()) {
+            $this->recordEvent(
+                $session,
+                $attacker->getX(),
+                $attacker->getY(),
+                sprintf('%s defeats %s.', $attackerName, $defenderName),
+            );
+
+            $combat->resolve();
+        }
+
+        $this->entityManager->persist($combat);
+        $this->entityManager->persist($attackerCombatant);
+        $this->entityManager->persist($defenderCombatant);
+    }
+
+    private function getOrCreateCombat(LocalSession $session): LocalCombat
+    {
+        $existing = $this->entityManager->getRepository(LocalCombat::class)->findOneBy(['session' => $session]);
+        if ($existing instanceof LocalCombat) {
+            return $existing;
+        }
+
+        $combat = new LocalCombat($session);
+        $this->entityManager->persist($combat);
+
+        return $combat;
+    }
+
+    private function getOrCreateCombatant(LocalCombat $combat, LocalActor $actor): LocalCombatant
+    {
+        $repo = $this->entityManager->getRepository(LocalCombatant::class);
+
+        $existing = $repo->findOneBy(['combat' => $combat, 'actorId' => (int)$actor->getId()]);
+        if ($existing instanceof LocalCombatant) {
+            return $existing;
+        }
+
+        $maxHp     = $this->maxHp($actor);
+        $combatant = new LocalCombatant($combat, actorId: (int)$actor->getId(), maxHp: $maxHp);
+        $this->entityManager->persist($combatant);
+
+        return $combatant;
+    }
+
+    private function maxHp(LocalActor $actor): int
+    {
+        $character = $this->entityManager->find(Character::class, $actor->getCharacterId());
+        if (!$character instanceof Character) {
+            return 13;
+        }
+
+        return 10 + ($character->getEndurance() * 2) + $character->getDurability();
+    }
+
+    private function damagePerHit(LocalActor $attacker, LocalActor $defender): int
+    {
+        $attackerCharacter = $this->entityManager->find(Character::class, $attacker->getCharacterId());
+        $defenderCharacter = $this->entityManager->find(Character::class, $defender->getCharacterId());
+
+        $attackerStrength   = $attackerCharacter instanceof Character ? $attackerCharacter->getStrength() : 1;
+        $defenderDurability = $defenderCharacter instanceof Character ? $defenderCharacter->getDurability() : 1;
+
+        return max(1, $attackerStrength - intdiv($defenderDurability, 2));
+    }
+
+    private function characterName(int $characterId): string
+    {
+        $character = $this->entityManager->find(Character::class, $characterId);
+        if ($character instanceof Character) {
+            return $character->getName();
+        }
+
+        return sprintf('Character#%d', $characterId);
+    }
+
+    private function recordEvent(LocalSession $session, int $eventX, int $eventY, string $message): void
+    {
+        (new LocalEventLog($this->entityManager))->record(
+            session: $session,
+            eventX: $eventX,
+            eventY: $eventY,
+            message: $message,
+            radius: new VisibilityRadius(2),
+        );
+    }
+}
+

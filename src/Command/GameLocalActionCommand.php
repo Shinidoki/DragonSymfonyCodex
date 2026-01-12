@@ -30,8 +30,9 @@ final class GameLocalActionCommand extends Command
     protected function configure(): void
     {
         $this->addOption('session', null, InputOption::VALUE_REQUIRED, 'Local session id');
-        $this->addOption('type', null, InputOption::VALUE_REQUIRED, 'Action type (move|wait)');
+        $this->addOption('type', null, InputOption::VALUE_REQUIRED, 'Action type (move|wait|talk|attack)');
         $this->addOption('dir', null, InputOption::VALUE_OPTIONAL, 'Direction for move (north|south|east|west)');
+        $this->addOption('target', null, InputOption::VALUE_OPTIONAL, 'Target actor id for talk/attack');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -46,7 +47,7 @@ final class GameLocalActionCommand extends Command
         try {
             $type = LocalActionType::from($typeRaw);
         } catch (\ValueError) {
-            $output->writeln('<error>--type must be move or wait</error>');
+            $output->writeln('<error>--type must be move, wait, talk, or attack</error>');
             return Command::INVALID;
         }
 
@@ -61,7 +62,16 @@ final class GameLocalActionCommand extends Command
             }
         }
 
-        $session = $this->handler->apply($sessionId, new LocalAction($type, $dir));
+        $target = null;
+        if ($type === LocalActionType::Talk || $type === LocalActionType::Attack) {
+            $target = (int)$input->getOption('target');
+            if ($target <= 0) {
+                $output->writeln('<error>--target must be a positive integer</error>');
+                return Command::INVALID;
+            }
+        }
+
+        $session = $this->handler->apply($sessionId, new LocalAction($type, $dir, $target));
 
         $output->writeln(sprintf(
             'Tick %d: player at (%d,%d)',
