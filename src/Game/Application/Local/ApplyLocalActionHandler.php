@@ -2,6 +2,7 @@
 
 namespace App\Game\Application\Local;
 
+use App\Entity\LocalActor;
 use App\Entity\LocalSession;
 use App\Game\Domain\LocalMap\LocalAction;
 use App\Game\Domain\LocalMap\LocalActionType;
@@ -15,6 +16,7 @@ final class ApplyLocalActionHandler
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly LocalMovement          $movement = new LocalMovement(),
+        private readonly ?LocalNpcTickRunner $npcTickRunner = null,
     )
     {
     }
@@ -37,9 +39,19 @@ final class ApplyLocalActionHandler
         }
 
         $session->incrementTick();
+
+        $playerActor = $this->entityManager->getRepository(LocalActor::class)->findOneBy([
+            'session' => $session,
+            'role'    => 'player',
+        ]);
+        if ($playerActor instanceof LocalActor) {
+            $playerActor->setPosition($session->getPlayerX(), $session->getPlayerY());
+        }
+
+        ($this->npcTickRunner ?? new LocalNpcTickRunner($this->entityManager))->advanceNpcTurns($session);
+
         $this->entityManager->flush();
 
         return $session;
     }
 }
-

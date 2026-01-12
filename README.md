@@ -66,6 +66,16 @@ php bin/console game:local:action --session=1 --type=move --dir=north
 php bin/console game:local:action --session=1 --type=wait
 ```
 
+Add a local NPC actor and give them an intent (MVP “nearby message” demo):
+
+```bash
+php bin/console game:local:add-actor --session=1 --character=2 --role=npc --x=0 --y=1
+php bin/console game:local:set-intent --actor=<npcActorId> --type=talk_to --target=<playerActorId>
+php bin/console game:local:action --session=1 --type=wait
+```
+
+When the NPC reaches the target and the player is nearby, a descriptive message prints under the tick output.
+
 Sleep/train are **long actions**: they temporarily suspend the local session, advance world time by days, then resume
 the same local session at the same local position.
 
@@ -96,6 +106,7 @@ Example endpoints:
 - `GET /api/worlds/{id}`
 - `GET /api/characters/{id}`
 - `GET /api/worlds/{id}/tiles?x=0&y=0`
+- `GET /api/local-sessions/{id}`
 
 ## Tests
 

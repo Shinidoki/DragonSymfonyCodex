@@ -3,6 +3,7 @@
 namespace App\Game\Application\Local;
 
 use App\Entity\Character;
+use App\Entity\LocalActor;
 use App\Entity\LocalSession;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -26,6 +27,23 @@ final class EnterLocalModeHandler
 
         $existing = $sessionRepository->findOneBy(['characterId' => $characterId, 'status' => 'active']);
         if ($existing instanceof LocalSession) {
+            $actor = $this->entityManager->getRepository(LocalActor::class)->findOneBy([
+                'session'     => $existing,
+                'characterId' => $characterId,
+            ]);
+
+            if (!$actor instanceof LocalActor) {
+                $actor = new LocalActor(
+                    $existing,
+                    characterId: $characterId,
+                    role: 'player',
+                    x: $existing->getPlayerX(),
+                    y: $existing->getPlayerY(),
+                );
+                $this->entityManager->persist($actor);
+                $this->entityManager->flush();
+            }
+
             return $existing;
         }
 
@@ -49,6 +67,17 @@ final class EnterLocalModeHandler
         );
 
         $this->entityManager->persist($session);
+        $this->entityManager->flush();
+
+        $actor = new LocalActor(
+            $session,
+            characterId: (int)$character->getId(),
+            role: 'player',
+            x: $session->getPlayerX(),
+            y: $session->getPlayerY(),
+        );
+
+        $this->entityManager->persist($actor);
         $this->entityManager->flush();
 
         return $session;

@@ -3,10 +3,13 @@
 namespace App\Tests\Game\Application\Local;
 
 use App\Entity\Character;
+use App\Entity\LocalActor;
+use App\Entity\LocalIntent;
 use App\Entity\World;
 use App\Game\Application\Local\EnterLocalModeHandler;
 use App\Game\Application\Local\LongActionType;
 use App\Game\Application\Local\StartLongActionHandler;
+use App\Game\Domain\LocalNpc\IntentType;
 use App\Game\Domain\Race;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingGrowthService;
@@ -65,5 +68,53 @@ final class StartLongActionHandlerTest extends KernelTestCase
 
         self::assertSame($startStrength + (7 * 3), $result->character->getStrength());
     }
-}
 
+    public function testLongActionsDoNotMoveLocalNpcActors(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $world  = new World('seed-1');
+        $player = new Character($world, 'Goku', Race::Saiyan);
+        $npc    = new Character($world, 'Krillin', Race::Human);
+
+        $entityManager->persist($world);
+        $entityManager->persist($player);
+        $entityManager->persist($npc);
+        $entityManager->flush();
+
+        $enter   = new EnterLocalModeHandler($entityManager);
+        $session = $enter->enter((int)$player->getId(), 8, 8);
+
+        $playerActor = $entityManager->getRepository(LocalActor::class)->findOneBy([
+            'session' => $session,
+            'role'    => 'player',
+        ]);
+        self::assertInstanceOf(LocalActor::class, $playerActor);
+
+        $npcActor = new LocalActor($session, characterId: (int)$npc->getId(), role: 'npc', x: 0, y: 0);
+        $entityManager->persist($npcActor);
+        $entityManager->flush();
+
+        $intent = new LocalIntent($npcActor, IntentType::MoveTo, targetActorId: (int)$playerActor->getId());
+        $entityManager->persist($intent);
+        $entityManager->flush();
+
+        $clock   = new SimulationClock(new TrainingGrowthService());
+        $handler = new StartLongActionHandler($entityManager, $clock);
+
+        $handler->start(
+            sessionId: (int)$session->getId(),
+            days: 2,
+            type: LongActionType::Train,
+            trainingContext: TrainingContext::Wilderness,
+        );
+
+        $reloadedNpcActor = $entityManager->find(LocalActor::class, (int)$npcActor->getId());
+        self::assertInstanceOf(LocalActor::class, $reloadedNpcActor);
+        self::assertSame(0, $reloadedNpcActor->getX());
+        self::assertSame(0, $reloadedNpcActor->getY());
+    }
+}

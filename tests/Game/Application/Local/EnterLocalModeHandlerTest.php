@@ -3,6 +3,7 @@
 namespace App\Tests\Game\Application\Local;
 
 use App\Entity\Character;
+use App\Entity\LocalActor;
 use App\Entity\LocalSession;
 use App\Entity\World;
 use App\Game\Application\Local\EnterLocalModeHandler;
@@ -46,5 +47,24 @@ final class EnterLocalModeHandlerTest extends KernelTestCase
         self::assertSame(2, $session->getTileX());
         self::assertSame(3, $session->getTileY());
         self::assertSame('active', $session->getStatus());
+
+        $actor = $entityManager->getRepository(LocalActor::class)->findOneBy([
+            'session'     => $session,
+            'characterId' => (int)$character->getId(),
+        ]);
+
+        self::assertInstanceOf(LocalActor::class, $actor);
+        self::assertSame('player', $actor->getRole());
+        self::assertSame($session->getPlayerX(), $actor->getX());
+        self::assertSame($session->getPlayerY(), $actor->getY());
+
+        $sessionAgain = $handler->enter((int)$character->getId(), 8, 8);
+        self::assertSame((int)$session->getId(), (int)$sessionAgain->getId());
+
+        $actorCount = $entityManager->getRepository(LocalActor::class)->count([
+            'session'     => $session,
+            'characterId' => (int)$character->getId(),
+        ]);
+        self::assertSame(1, $actorCount);
     }
 }
