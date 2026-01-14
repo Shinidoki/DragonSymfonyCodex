@@ -3,9 +3,11 @@
 namespace App\Tests\Game\Application\Local;
 
 use App\Entity\Character;
+use App\Entity\CharacterTechnique;
 use App\Entity\LocalActor;
 use App\Entity\LocalCombat;
 use App\Entity\LocalCombatant;
+use App\Entity\TechniqueDefinition;
 use App\Entity\World;
 use App\Game\Application\Local\ApplyLocalActionHandler;
 use App\Game\Application\Local\EnterLocalModeHandler;
@@ -13,7 +15,7 @@ use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\LocalAction;
 use App\Game\Domain\LocalMap\LocalActionType;
 use App\Game\Domain\Race;
-use App\Game\Domain\Techniques\Technique;
+use App\Game\Domain\Techniques\TechniqueType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -49,6 +51,18 @@ final class LocalKiBlastFlowTest extends KernelTestCase
         $entityManager->persist($world);
         $entityManager->persist($player);
         $entityManager->persist($npc);
+
+        $technique = new TechniqueDefinition(
+            code: 'ki_blast',
+            name: 'Ki Blast',
+            type: TechniqueType::Blast,
+            config: ['range' => 2, 'kiCost' => 3],
+            enabled: true,
+            version: 1,
+        );
+        $entityManager->persist($technique);
+        $entityManager->persist(new CharacterTechnique($player, $technique, proficiency: 100));
+
         $entityManager->flush();
 
         $session = (new EnterLocalModeHandler($entityManager))->enter((int)$player->getId(), 8, 8);
@@ -68,7 +82,7 @@ final class LocalKiBlastFlowTest extends KernelTestCase
 
         (new ApplyLocalActionHandler($entityManager))->apply(
             (int)$session->getId(),
-            new LocalAction(LocalActionType::Technique, targetActorId: (int)$npcActor->getId(), technique: Technique::KiBlast),
+            new LocalAction(LocalActionType::Technique, targetActorId: (int)$npcActor->getId(), techniqueCode: 'ki_blast'),
         );
 
         $combat = $entityManager->getRepository(LocalCombat::class)->findOneBy(['session' => $session]);

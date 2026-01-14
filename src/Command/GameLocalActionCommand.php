@@ -7,7 +7,6 @@ use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\Direction;
 use App\Game\Domain\LocalMap\LocalAction;
 use App\Game\Domain\LocalMap\LocalActionType;
-use App\Game\Domain\Techniques\Technique;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -34,7 +33,7 @@ final class GameLocalActionCommand extends Command
         $this->addOption('type', null, InputOption::VALUE_REQUIRED, 'Action type (move|wait|talk|attack|technique)');
         $this->addOption('dir', null, InputOption::VALUE_OPTIONAL, 'Direction for move (north|south|east|west)');
         $this->addOption('target', null, InputOption::VALUE_OPTIONAL, 'Target actor id for talk/attack');
-        $this->addOption('technique', null, InputOption::VALUE_OPTIONAL, 'Technique name for type=technique (ki_blast)');
+        $this->addOption('technique', null, InputOption::VALUE_OPTIONAL, 'Technique code for type=technique (e.g. ki_blast)');
     }
 
     protected function execute(InputInterface $input, OutputInterface $output): int
@@ -73,7 +72,7 @@ final class GameLocalActionCommand extends Command
             }
         }
 
-        $technique = null;
+        $techniqueCode = null;
         if ($type === LocalActionType::Technique) {
             $techniqueRaw = strtolower((string)$input->getOption('technique'));
             if ($techniqueRaw === '') {
@@ -81,15 +80,10 @@ final class GameLocalActionCommand extends Command
                 return Command::INVALID;
             }
 
-            try {
-                $technique = Technique::from($techniqueRaw);
-            } catch (\ValueError) {
-                $output->writeln('<error>--technique must be ki_blast</error>');
-                return Command::INVALID;
-            }
+            $techniqueCode = $techniqueRaw;
         }
 
-        $session = $this->handler->apply($sessionId, new LocalAction($type, $dir, $target, $technique));
+        $session = $this->handler->apply($sessionId, new LocalAction($type, $dir, $target, $techniqueCode));
 
         $output->writeln(sprintf(
             'Tick %d: player at (%d,%d)',

@@ -3,14 +3,15 @@
 namespace App\Game\Application\Local\Combat;
 
 use App\Entity\Character;
+use App\Entity\CharacterTechnique;
 use App\Entity\LocalActor;
 use App\Entity\LocalCombat;
 use App\Entity\LocalCombatant;
 use App\Entity\LocalSession;
+use App\Entity\TechniqueDefinition;
 use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\VisibilityRadius;
-use App\Game\Domain\Techniques\Technique;
-use App\Game\Domain\Techniques\TechniqueCatalog;
+use App\Repository\TechniqueDefinitionRepository;
 use App\Game\Domain\Transformations\TransformationService;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -20,7 +21,7 @@ final class CombatResolver
     {
     }
 
-    public function useTechnique(LocalSession $session, LocalActor $attacker, int $targetActorId, Technique $technique): void
+    public function useTechnique(LocalSession $session, LocalActor $attacker, int $targetActorId, string $techniqueCode): void
     {
         $target = $this->entityManager->find(LocalActor::class, $targetActorId);
         if (!$target instanceof LocalActor || (int)$target->getSession()->getId() !== (int)$session->getId()) {
@@ -28,9 +29,40 @@ final class CombatResolver
             return;
         }
 
-        $catalog  = new TechniqueCatalog();
+        $techniqueCode = strtolower(trim($techniqueCode));
+        if ($techniqueCode === '') {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No technique selected.');
+            return;
+        }
+
+        /** @var TechniqueDefinitionRepository $techniqueRepo */
+        $techniqueRepo = $this->entityManager->getRepository(TechniqueDefinition::class);
+
+        $definition = $techniqueRepo->findEnabledByCode($techniqueCode);
+        if (!$definition instanceof TechniqueDefinition) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Unknown technique.');
+            return;
+        }
+
+        $attackerCharacter = $this->entityManager->find(Character::class, $attacker->getCharacterId());
+        if (!$attackerCharacter instanceof Character) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No character for attacker.');
+            return;
+        }
+
+        $knowledge = $this->entityManager->getRepository(CharacterTechnique::class)->findOneBy([
+            'character' => $attackerCharacter,
+            'technique' => $definition,
+        ]);
+        if (!$knowledge instanceof CharacterTechnique) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'You do not know that technique.');
+            return;
+        }
+
+        $config = $definition->getConfig();
+        $range  = (int)($config['range'] ?? 1);
         $distance = abs($attacker->getX() - $target->getX()) + abs($attacker->getY() - $target->getY());
-        if ($distance > $catalog->range($technique)) {
+        if ($distance > $range) {
             $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Target is too far away.');
             return;
         }
@@ -39,7 +71,7 @@ final class CombatResolver
         $attackerCombatant = $this->getOrCreateCombatant($combat, $attacker);
         $defenderCombatant = $this->getOrCreateCombatant($combat, $target);
 
-        $cost = $catalog->kiCost($technique);
+        $cost = (int)($config['kiCost'] ?? 1);
         if (!$attackerCombatant->spendKi($cost)) {
             $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Not enough Ki.');
             $this->entityManager->persist($combat);
@@ -48,9 +80,8 @@ final class CombatResolver
             return;
         }
 
-        $damage = match ($technique) {
-            Technique::KiBlast => $this->damageForKiBlast($attacker, $target),
-        };
+        // Temporary MVP wiring: treat all techniques like a "blast" until executors land (next task).
+        $damage = $this->damageForKiBlast($attacker, $target);
 
         $defenderCombatant->applyDamage($damage, $session->getCurrentTick());
 
@@ -61,7 +92,7 @@ final class CombatResolver
             $session,
             $attacker->getX(),
             $attacker->getY(),
-            sprintf('%s uses Ki Blast on %s for %d damage.', $attackerName, $defenderName, $damage),
+            sprintf('%s uses %s on %s for %d damage.', $attackerName, $definition->getName(), $defenderName, $damage),
         );
 
         if ($defenderCombatant->isDefeated()) {
