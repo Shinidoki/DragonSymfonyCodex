@@ -15,6 +15,7 @@ use App\Game\Domain\LocalMap\LocalMapSize;
 use App\Game\Domain\LocalMap\LocalMovement;
 use App\Game\Domain\LocalMap\VisibilityRadius;
 use App\Game\Domain\LocalTurns\TurnScheduler;
+use App\Game\Domain\Techniques\Technique;
 use App\Game\Domain\Transformations\TransformationService;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -239,6 +240,15 @@ final class LocalTurnEngine
             }
 
             (new CombatResolver($this->entityManager))->attack($session, $playerActor, $action->targetActorId);
+            return;
+        }
+
+        if ($action->type === LocalActionType::Technique) {
+            if ($action->targetActorId === null || !$action->technique instanceof Technique) {
+                throw new \InvalidArgumentException('Technique action requires target actor id and technique.');
+            }
+
+            (new CombatResolver($this->entityManager))->useTechnique($session, $playerActor, $action->targetActorId, $action->technique);
             return;
         }
 

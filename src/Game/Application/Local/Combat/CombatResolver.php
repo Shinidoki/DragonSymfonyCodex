@@ -9,6 +9,8 @@ use App\Entity\LocalCombatant;
 use App\Entity\LocalSession;
 use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\VisibilityRadius;
+use App\Game\Domain\Techniques\Technique;
+use App\Game\Domain\Techniques\TechniqueCatalog;
 use App\Game\Domain\Transformations\TransformationService;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -16,6 +18,66 @@ final class CombatResolver
 {
     public function __construct(private readonly EntityManagerInterface $entityManager)
     {
+    }
+
+    public function useTechnique(LocalSession $session, LocalActor $attacker, int $targetActorId, Technique $technique): void
+    {
+        $target = $this->entityManager->find(LocalActor::class, $targetActorId);
+        if (!$target instanceof LocalActor || (int)$target->getSession()->getId() !== (int)$session->getId()) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No valid target.');
+            return;
+        }
+
+        $catalog  = new TechniqueCatalog();
+        $distance = abs($attacker->getX() - $target->getX()) + abs($attacker->getY() - $target->getY());
+        if ($distance > $catalog->range($technique)) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Target is too far away.');
+            return;
+        }
+
+        $combat            = $this->getOrCreateCombat($session);
+        $attackerCombatant = $this->getOrCreateCombatant($combat, $attacker);
+        $defenderCombatant = $this->getOrCreateCombatant($combat, $target);
+
+        $cost = $catalog->kiCost($technique);
+        if (!$attackerCombatant->spendKi($cost)) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Not enough Ki.');
+            $this->entityManager->persist($combat);
+            $this->entityManager->persist($attackerCombatant);
+            $this->entityManager->persist($defenderCombatant);
+            return;
+        }
+
+        $damage = match ($technique) {
+            Technique::KiBlast => $this->damageForKiBlast($attacker, $target),
+        };
+
+        $defenderCombatant->applyDamage($damage, $session->getCurrentTick());
+
+        $attackerName = $this->characterName($attacker->getCharacterId());
+        $defenderName = $this->characterName($target->getCharacterId());
+
+        $this->recordEvent(
+            $session,
+            $attacker->getX(),
+            $attacker->getY(),
+            sprintf('%s uses Ki Blast on %s for %d damage.', $attackerName, $defenderName, $damage),
+        );
+
+        if ($defenderCombatant->isDefeated()) {
+            $this->recordEvent(
+                $session,
+                $attacker->getX(),
+                $attacker->getY(),
+                sprintf('%s defeats %s.', $attackerName, $defenderName),
+            );
+
+            $combat->resolve();
+        }
+
+        $this->entityManager->persist($combat);
+        $this->entityManager->persist($attackerCombatant);
+        $this->entityManager->persist($defenderCombatant);
     }
 
     public function attack(LocalSession $session, LocalActor $attacker, int $targetActorId): void
@@ -143,6 +205,28 @@ final class CombatResolver
         }
 
         return max(1, $attackerStrength - intdiv($defenderDurability, 2));
+    }
+
+    private function damageForKiBlast(LocalActor $attacker, LocalActor $defender): int
+    {
+        $transformations = new TransformationService();
+
+        $attackerCharacter = $this->entityManager->find(Character::class, $attacker->getCharacterId());
+        $defenderCharacter = $this->entityManager->find(Character::class, $defender->getCharacterId());
+
+        $attackerKiControl = 1;
+        if ($attackerCharacter instanceof Character) {
+            $attackerEffective = $transformations->effectiveAttributes($attackerCharacter->getCoreAttributes(), $attackerCharacter->getTransformationState());
+            $attackerKiControl = $attackerEffective->kiControl;
+        }
+
+        $defenderDurability = 1;
+        if ($defenderCharacter instanceof Character) {
+            $defenderEffective = $transformations->effectiveAttributes($defenderCharacter->getCoreAttributes(), $defenderCharacter->getTransformationState());
+            $defenderDurability = $defenderEffective->durability;
+        }
+
+        return max(1, $attackerKiControl - intdiv($defenderDurability, 2));
     }
 
     private function characterName(int $characterId): string

@@ -33,6 +33,8 @@ final class LocalSessionController extends AbstractController
                 'actorId'        => $combatant->getActorId(),
                 'maxHp'          => $combatant->getMaxHp(),
                 'currentHp'      => $combatant->getCurrentHp(),
+                'maxKi'          => $combatant->getMaxKi(),
+                'currentKi'      => $combatant->getCurrentKi(),
                 'defeatedAtTick' => $combatant->getDefeatedAtTick(),
             ], $combatants);
         }
