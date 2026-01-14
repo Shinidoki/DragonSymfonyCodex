@@ -88,10 +88,25 @@ final class CombatResolver
         }
 
         $maxHp     = $this->maxHp($actor);
-        $combatant = new LocalCombatant($combat, actorId: (int)$actor->getId(), maxHp: $maxHp);
+        $maxKi     = $this->maxKi($actor);
+        $combatant = new LocalCombatant($combat, actorId: (int)$actor->getId(), maxHp: $maxHp, maxKi: $maxKi);
         $this->entityManager->persist($combatant);
 
         return $combatant;
+    }
+
+    private function maxKi(LocalActor $actor): int
+    {
+        $transformations = new TransformationService();
+
+        $character = $this->entityManager->find(Character::class, $actor->getCharacterId());
+        if (!$character instanceof Character) {
+            return 9;
+        }
+
+        $effective = $transformations->effectiveAttributes($character->getCoreAttributes(), $character->getTransformationState());
+
+        return 5 + ($effective->kiCapacity * 3) + $effective->kiControl;
     }
 
     private function maxHp(LocalActor $actor): int

@@ -28,10 +28,16 @@ class LocalCombatant
     #[ORM\Column]
     private int $currentHp;
 
+    #[ORM\Column]
+    private int $maxKi;
+
+    #[ORM\Column]
+    private int $currentKi;
+
     #[ORM\Column(nullable: true)]
     private ?int $defeatedAtTick = null;
 
-    public function __construct(LocalCombat $combat, int $actorId, int $maxHp)
+    public function __construct(LocalCombat $combat, int $actorId, int $maxHp, int $maxKi)
     {
         if ($actorId <= 0) {
             throw new \InvalidArgumentException('actorId must be positive.');
@@ -39,11 +45,16 @@ class LocalCombatant
         if ($maxHp <= 0) {
             throw new \InvalidArgumentException('maxHp must be positive.');
         }
+        if ($maxKi <= 0) {
+            throw new \InvalidArgumentException('maxKi must be positive.');
+        }
 
         $this->combat    = $combat;
         $this->actorId   = $actorId;
         $this->maxHp     = $maxHp;
         $this->currentHp = $maxHp;
+        $this->maxKi     = $maxKi;
+        $this->currentKi = $maxKi;
     }
 
     public function getId(): ?int
@@ -69,6 +80,16 @@ class LocalCombatant
     public function getCurrentHp(): int
     {
         return $this->currentHp;
+    }
+
+    public function getMaxKi(): int
+    {
+        return $this->maxKi;
+    }
+
+    public function getCurrentKi(): int
+    {
+        return $this->currentKi;
     }
 
     public function getDefeatedAtTick(): ?int
@@ -98,5 +119,18 @@ class LocalCombatant
             $this->defeatedAtTick = $tick;
         }
     }
-}
 
+    public function spendKi(int $amount): bool
+    {
+        if ($amount <= 0) {
+            throw new \InvalidArgumentException('amount must be positive.');
+        }
+
+        if ($this->currentKi < $amount) {
+            return false;
+        }
+
+        $this->currentKi -= $amount;
+        return true;
+    }
+}

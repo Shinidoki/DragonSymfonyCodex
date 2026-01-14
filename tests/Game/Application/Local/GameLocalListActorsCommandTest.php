@@ -58,8 +58,8 @@ final class GameLocalListActorsCommandTest extends KernelTestCase
         $entityManager->persist($combat);
         $entityManager->flush();
 
-        $entityManager->persist(new LocalCombatant($combat, actorId: (int)$playerActor->getId(), maxHp: 13));
-        $entityManager->persist(new LocalCombatant($combat, actorId: (int)$npcActor->getId(), maxHp: 17));
+        $entityManager->persist(new LocalCombatant($combat, actorId: (int)$playerActor->getId(), maxHp: 13, maxKi: 9));
+        $entityManager->persist(new LocalCombatant($combat, actorId: (int)$npcActor->getId(), maxHp: 17, maxKi: 9));
         $entityManager->flush();
 
         $application = new Application(self::$kernel);
@@ -78,4 +78,3 @@ final class GameLocalListActorsCommandTest extends KernelTestCase
         self::assertStringContainsString('hp=17/17', $out);
     }
 }
-

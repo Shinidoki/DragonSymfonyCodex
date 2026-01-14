@@ -55,8 +55,8 @@ final class LocalCombatPersistenceTest extends KernelTestCase
         $entityManager->persist($combat);
         $entityManager->flush();
 
-        $c1 = new LocalCombatant($combat, actorId: (int)$playerActor->getId(), maxHp: 13);
-        $c2 = new LocalCombatant($combat, actorId: (int)$npcActor->getId(), maxHp: 13);
+        $c1 = new LocalCombatant($combat, actorId: (int)$playerActor->getId(), maxHp: 13, maxKi: 9);
+        $c2 = new LocalCombatant($combat, actorId: (int)$npcActor->getId(), maxHp: 13, maxKi: 9);
         $entityManager->persist($c1);
         $entityManager->persist($c2);
         $entityManager->flush();
@@ -72,4 +72,3 @@ final class LocalCombatPersistenceTest extends KernelTestCase
         self::assertSame((int)$playerActor->getId(), $combatants[0]->getActorId());
     }
 }
-
