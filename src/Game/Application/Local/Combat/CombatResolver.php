@@ -9,6 +9,7 @@ use App\Entity\LocalCombatant;
 use App\Entity\LocalSession;
 use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\VisibilityRadius;
+use App\Game\Domain\Transformations\TransformationService;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class CombatResolver
@@ -95,21 +96,36 @@ final class CombatResolver
 
     private function maxHp(LocalActor $actor): int
     {
+        $transformations = new TransformationService();
+
         $character = $this->entityManager->find(Character::class, $actor->getCharacterId());
         if (!$character instanceof Character) {
             return 13;
         }
 
-        return 10 + ($character->getEndurance() * 2) + $character->getDurability();
+        $effective = $transformations->effectiveAttributes($character->getCoreAttributes(), $character->getTransformationState());
+
+        return 10 + ($effective->endurance * 2) + $effective->durability;
     }
 
     private function damagePerHit(LocalActor $attacker, LocalActor $defender): int
     {
+        $transformations = new TransformationService();
+
         $attackerCharacter = $this->entityManager->find(Character::class, $attacker->getCharacterId());
         $defenderCharacter = $this->entityManager->find(Character::class, $defender->getCharacterId());
 
-        $attackerStrength   = $attackerCharacter instanceof Character ? $attackerCharacter->getStrength() : 1;
-        $defenderDurability = $defenderCharacter instanceof Character ? $defenderCharacter->getDurability() : 1;
+        $attackerStrength = 1;
+        if ($attackerCharacter instanceof Character) {
+            $attackerEffective = $transformations->effectiveAttributes($attackerCharacter->getCoreAttributes(), $attackerCharacter->getTransformationState());
+            $attackerStrength  = $attackerEffective->strength;
+        }
+
+        $defenderDurability = 1;
+        if ($defenderCharacter instanceof Character) {
+            $defenderEffective = $transformations->effectiveAttributes($defenderCharacter->getCoreAttributes(), $defenderCharacter->getTransformationState());
+            $defenderDurability = $defenderEffective->durability;
+        }
 
         return max(1, $attackerStrength - intdiv($defenderDurability, 2));
     }
@@ -135,4 +151,3 @@ final class CombatResolver
         );
     }
 }
-

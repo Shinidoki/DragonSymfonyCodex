@@ -15,6 +15,7 @@ use App\Game\Domain\LocalMap\LocalMapSize;
 use App\Game\Domain\LocalMap\LocalMovement;
 use App\Game\Domain\LocalMap\VisibilityRadius;
 use App\Game\Domain\LocalTurns\TurnScheduler;
+use App\Game\Domain\Transformations\TransformationService;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class LocalTurnEngine
@@ -90,6 +91,8 @@ final class LocalTurnEngine
             }
         }
 
+        $transformations = new TransformationService();
+
         $state = [];
         foreach ($actors as $actor) {
             if (isset($defeatedActorIds[(int)$actor->getId()])) {
@@ -99,7 +102,8 @@ final class LocalTurnEngine
             $speed = 1;
             $character = $charactersById[$actor->getCharacterId()] ?? null;
             if ($character instanceof Character) {
-                $speed = max(1, $character->getSpeed());
+                $effective = $transformations->effectiveAttributes($character->getCoreAttributes(), $character->getTransformationState());
+                $speed     = max(1, $effective->speed);
             }
 
             $state[] = [
