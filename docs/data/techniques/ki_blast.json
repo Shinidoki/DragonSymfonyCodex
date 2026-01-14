@@ -1,0 +1,26 @@
+{
+  "code": "ki_blast",
+  "name": "Ki Blast",
+  "type": "blast",
+  "enabled": true,
+  "version": 1,
+  "config": {
+    "range": 2,
+    "kiCost": 3,
+    "damage": {
+      "stat": "kiControl",
+      "statMultiplier": 1.0,
+      "base": 0,
+      "min": 1,
+      "mitigationStat": "durability",
+      "mitigationDivisor": 2
+    },
+    "successChance": { "at0": 1.0, "at100": 1.0 },
+    "failureKiCostMultiplier": 0.5,
+    "proficiencyEffects": {
+      "kiCostMultiplier": { "at0": 1.0, "at100": 0.8 },
+      "damageMultiplier": { "at0": 1.0, "at100": 1.25 }
+    }
+  }
+}
+

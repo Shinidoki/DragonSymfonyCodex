@@ -1,0 +1,27 @@
+{
+  "code": "kamehameha",
+  "name": "Kamehameha",
+  "type": "charged",
+  "enabled": true,
+  "version": 1,
+  "config": {
+    "range": 4,
+    "kiCost": 12,
+    "chargeTicks": 2,
+    "damage": {
+      "stat": "kiControl",
+      "statMultiplier": 2.0,
+      "base": 0,
+      "min": 1,
+      "mitigationStat": "durability",
+      "mitigationDivisor": 2
+    },
+    "successChance": { "at0": 0.8, "at100": 1.0 },
+    "failureKiCostMultiplier": 0.5,
+    "proficiencyEffects": {
+      "kiCostMultiplier": { "at0": 1.0, "at100": 0.7 },
+      "damageMultiplier": { "at0": 1.0, "at100": 1.3 }
+    }
+  }
+}
+
