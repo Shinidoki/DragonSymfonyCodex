@@ -4,6 +4,8 @@ namespace App\Entity;
 
 use App\Game\Domain\Race;
 use App\Game\Domain\Stats\CoreAttributes;
+use App\Game\Domain\Transformations\Transformation;
+use App\Game\Domain\Transformations\TransformationState;
 use App\Repository\CharacterRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -74,6 +76,15 @@ class Character
 
     #[ORM\Column]
     private int $adaptability = 1;
+
+    #[ORM\Column(enumType: Transformation::class, nullable: true)]
+    private ?Transformation $transformationActive = null;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $transformationActiveTicks = 0;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $transformationExhaustionDaysRemaining = 0;
 
     public function __construct(World $world, string $name, Race $race)
     {
@@ -203,6 +214,29 @@ class Character
         $this->focus        = $attributes->focus;
         $this->discipline   = $attributes->discipline;
         $this->adaptability = $attributes->adaptability;
+    }
+
+    public function getTransformationState(): TransformationState
+    {
+        return new TransformationState(
+            active: $this->transformationActive,
+            activeTicks: $this->transformationActiveTicks,
+            exhaustionDaysRemaining: $this->transformationExhaustionDaysRemaining,
+        );
+    }
+
+    public function setTransformationState(TransformationState $state): void
+    {
+        if ($state->activeTicks < 0) {
+            throw new \InvalidArgumentException('activeTicks must be >= 0.');
+        }
+        if ($state->exhaustionDaysRemaining < 0) {
+            throw new \InvalidArgumentException('exhaustionDaysRemaining must be >= 0.');
+        }
+
+        $this->transformationActive                   = $state->active;
+        $this->transformationActiveTicks              = $state->activeTicks;
+        $this->transformationExhaustionDaysRemaining  = $state->exhaustionDaysRemaining;
     }
 
     public function getStrength(): int

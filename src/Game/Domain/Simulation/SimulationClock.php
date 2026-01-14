@@ -10,6 +10,7 @@ use App\Game\Domain\Npc\DailyActivity;
 use App\Game\Domain\Npc\DailyPlanner;
 use App\Game\Domain\Stats\Growth\TrainingGrowthService;
 use App\Game\Domain\Stats\Growth\TrainingIntensity;
+use App\Game\Domain\Transformations\TransformationService;
 
 final class SimulationClock
 {
@@ -17,6 +18,7 @@ final class SimulationClock
         private readonly TrainingGrowthService $trainingGrowth,
         private readonly ?DailyPlanner         $dailyPlanner = null,
         private readonly ?StepTowardTarget     $stepTowardTarget = null,
+        private readonly ?TransformationService $transformationService = null,
     )
     {
     }
@@ -32,6 +34,7 @@ final class SimulationClock
 
         $planner = $this->dailyPlanner ?? new DailyPlanner();
         $stepper = $this->stepTowardTarget ?? new StepTowardTarget();
+        $transformations = $this->transformationService ?? new TransformationService();
 
         for ($i = 0; $i < $days; $i++) {
             $world->advanceDays(1);
@@ -44,6 +47,7 @@ final class SimulationClock
                 if ($plan->activity === DailyActivity::Train) {
                     $after = $this->trainingGrowth->train($character->getCoreAttributes(), $intensity);
                     $character->applyCoreAttributes($after);
+                    $this->advanceTransformationDay($character, $transformations);
                     continue;
                 }
 
@@ -57,6 +61,8 @@ final class SimulationClock
                         $character->clearTravelTarget();
                     }
                 }
+
+                $this->advanceTransformationDay($character, $transformations);
             }
         }
     }
@@ -89,6 +95,7 @@ final class SimulationClock
 
         $planner = $this->dailyPlanner ?? new DailyPlanner();
         $stepper = $this->stepTowardTarget ?? new StepTowardTarget();
+        $transformations = $this->transformationService ?? new TransformationService();
 
         for ($i = 0; $i < $days; $i++) {
             $world->advanceDays(1);
@@ -101,6 +108,8 @@ final class SimulationClock
                         $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $trainingMultiplier);
                         $character->applyCoreAttributes($after);
                     }
+
+                    $this->advanceTransformationDay($character, $transformations);
                     continue;
                 }
 
@@ -109,6 +118,7 @@ final class SimulationClock
                 if ($plan->activity === DailyActivity::Train) {
                     $after = $this->trainingGrowth->train($character->getCoreAttributes(), $intensity);
                     $character->applyCoreAttributes($after);
+                    $this->advanceTransformationDay($character, $transformations);
                     continue;
                 }
 
@@ -122,7 +132,19 @@ final class SimulationClock
                         $character->clearTravelTarget();
                     }
                 }
+
+                $this->advanceTransformationDay($character, $transformations);
             }
         }
+    }
+
+    private function advanceTransformationDay(Character $character, TransformationService $service): void
+    {
+        $state = $character->getTransformationState();
+        if ($state->active !== null) {
+            $state = $service->deactivate($state);
+        }
+
+        $character->setTransformationState($service->advanceDay($state));
     }
 }
