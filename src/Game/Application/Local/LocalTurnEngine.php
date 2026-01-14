@@ -63,8 +63,13 @@ final class LocalTurnEngine
         }
 
         $this->incrementTick($session);
-        $this->applyPlayerLocalAction($session, $playerActor, $playerAction);
-        $playerActor->setPosition($session->getPlayerX(), $session->getPlayerY());
+
+        if ($playerActor->isCharging()) {
+            $this->advanceChargingTurn($session, $playerActor);
+        } else {
+            $this->applyPlayerLocalAction($session, $playerActor, $playerAction);
+            $playerActor->setPosition($session->getPlayerX(), $session->getPlayerY());
+        }
 
         // Advance NPC actions until the player is next to act again.
         while ($this->peekNextActorId($session, $actors) !== (int)$playerActor->getId()) {
@@ -142,7 +147,40 @@ final class LocalTurnEngine
         }
 
         $this->incrementTick($session);
+
+        if ($nextActor->isCharging()) {
+            $this->advanceChargingTurn($session, $nextActor);
+            return;
+        }
+
         ($this->npcTickRunner ?? new LocalNpcTickRunner($this->entityManager))->applyNpcTurn($session, $nextActor, $playerActor);
+    }
+
+    private function advanceChargingTurn(LocalSession $session, LocalActor $actor): void
+    {
+        $actor->decrementChargingTick();
+
+        if ($actor->getChargingTicksRemaining() > 0) {
+            (new LocalEventLog($this->entityManager))->record(
+                $session,
+                $actor->getX(),
+                $actor->getY(),
+                sprintf('%s continues charging.', $this->characterName($actor->getCharacterId())),
+                new VisibilityRadius(2),
+            );
+
+            return;
+        }
+
+        $techniqueCode = $actor->getChargingTechniqueCode();
+        $targetId      = $actor->getChargingTargetActorId();
+        $actor->clearCharging();
+
+        if ($techniqueCode === null || $targetId === null) {
+            return;
+        }
+
+        (new CombatResolver($this->entityManager))->useTechnique($session, $actor, $targetId, $techniqueCode);
     }
 
     /**

@@ -38,6 +38,15 @@ class LocalActor
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $chargingTechniqueCode = null;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $chargingTicksRemaining = 0;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $chargingTargetActorId = null;
+
     public function __construct(LocalSession $session, int $characterId, string $role, int $x, int $y)
     {
         if ($characterId <= 0) {
@@ -116,5 +125,58 @@ class LocalActor
     {
         return $this->createdAt;
     }
-}
 
+    public function isCharging(): bool
+    {
+        return $this->chargingTechniqueCode !== null && $this->chargingTicksRemaining > 0;
+    }
+
+    public function getChargingTechniqueCode(): ?string
+    {
+        return $this->chargingTechniqueCode;
+    }
+
+    public function getChargingTicksRemaining(): int
+    {
+        return $this->chargingTicksRemaining;
+    }
+
+    public function getChargingTargetActorId(): ?int
+    {
+        return $this->chargingTargetActorId;
+    }
+
+    public function startCharging(string $techniqueCode, int $ticksRemaining, int $targetActorId): void
+    {
+        $techniqueCode = strtolower(trim($techniqueCode));
+        if ($techniqueCode === '') {
+            throw new \InvalidArgumentException('techniqueCode must not be empty.');
+        }
+        if ($ticksRemaining < 0) {
+            throw new \InvalidArgumentException('ticksRemaining must be >= 0.');
+        }
+        if ($targetActorId <= 0) {
+            throw new \InvalidArgumentException('targetActorId must be positive.');
+        }
+
+        $this->chargingTechniqueCode  = $techniqueCode;
+        $this->chargingTicksRemaining = $ticksRemaining;
+        $this->chargingTargetActorId  = $targetActorId;
+    }
+
+    public function decrementChargingTick(): void
+    {
+        if ($this->chargingTicksRemaining <= 0) {
+            return;
+        }
+
+        $this->chargingTicksRemaining--;
+    }
+
+    public function clearCharging(): void
+    {
+        $this->chargingTechniqueCode  = null;
+        $this->chargingTicksRemaining = 0;
+        $this->chargingTargetActorId  = null;
+    }
+}

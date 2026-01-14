@@ -11,6 +11,13 @@ use App\Entity\LocalSession;
 use App\Entity\TechniqueDefinition;
 use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\VisibilityRadius;
+use App\Game\Domain\Techniques\Execution\BeamExecutor;
+use App\Game\Domain\Techniques\Execution\BlastExecutor;
+use App\Game\Domain\Techniques\Execution\ChargedExecutor;
+use App\Game\Domain\Techniques\Execution\TechniqueContext;
+use App\Game\Domain\Techniques\Execution\TechniqueExecution;
+use App\Game\Domain\Techniques\Execution\TechniqueExecutor;
+use App\Game\Domain\Techniques\TechniqueType;
 use App\Repository\TechniqueDefinitionRepository;
 use App\Game\Domain\Transformations\TransformationService;
 use Doctrine\ORM\EntityManagerInterface;
@@ -67,12 +74,37 @@ final class CombatResolver
             return;
         }
 
+        if ($attacker->isCharging()) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Already charging.');
+            return;
+        }
+
         $combat            = $this->getOrCreateCombat($session);
         $attackerCombatant = $this->getOrCreateCombatant($combat, $attacker);
         $defenderCombatant = $this->getOrCreateCombatant($combat, $target);
 
-        $cost = (int)($config['kiCost'] ?? 1);
-        if (!$attackerCombatant->spendKi($cost)) {
+        $defenderCharacter = $this->entityManager->find(Character::class, $target->getCharacterId());
+        if (!$defenderCharacter instanceof Character) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No character for target.');
+            return;
+        }
+
+        $context = new TechniqueContext(
+            sessionId: (int)$session->getId(),
+            tick: $session->getCurrentTick(),
+            definition: $definition,
+            knowledge: $knowledge,
+            attackerActor: $attacker,
+            defenderActor: $target,
+            attackerCharacter: $attackerCharacter,
+            defenderCharacter: $defenderCharacter,
+        );
+
+        $executor = $this->executorFor($definition->getType());
+        $execution = $executor->execute($context);
+
+        $spent = $execution->kiSpent;
+        if ($spent > 0 && !$attackerCombatant->spendKi($spent)) {
             $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Not enough Ki.');
             $this->entityManager->persist($combat);
             $this->entityManager->persist($attackerCombatant);
@@ -80,35 +112,48 @@ final class CombatResolver
             return;
         }
 
-        // Temporary MVP wiring: treat all techniques like a "blast" until executors land (next task).
-        $damage = $this->damageForKiBlast($attacker, $target);
+        if ($execution->startedChargingCode !== null && $execution->startedChargingTicksRemaining !== null && $execution->startedChargingTargetActorId !== null) {
+            $attacker->startCharging(
+                $execution->startedChargingCode,
+                $execution->startedChargingTicksRemaining,
+                $execution->startedChargingTargetActorId,
+            );
+        }
 
-        $defenderCombatant->applyDamage($damage, $session->getCurrentTick());
+        if ($execution->clearedCharging) {
+            $attacker->clearCharging();
+        }
 
-        $attackerName = $this->characterName($attacker->getCharacterId());
-        $defenderName = $this->characterName($target->getCharacterId());
+        if ($execution->damage > 0) {
+            $defenderCombatant->applyDamage($execution->damage, $session->getCurrentTick());
+        }
 
-        $this->recordEvent(
-            $session,
-            $attacker->getX(),
-            $attacker->getY(),
-            sprintf('%s uses %s on %s for %d damage.', $attackerName, $definition->getName(), $defenderName, $damage),
-        );
+        $this->recordEvent($session, $attacker->getX(), $attacker->getY(), $execution->message);
 
         if ($defenderCombatant->isDefeated()) {
             $this->recordEvent(
                 $session,
                 $attacker->getX(),
                 $attacker->getY(),
-                sprintf('%s defeats %s.', $attackerName, $defenderName),
+                sprintf('%s defeats %s.', $attackerCharacter->getName(), $defenderCharacter->getName()),
             );
 
             $combat->resolve();
         }
 
+        if ($execution->success) {
+            $knowledge->incrementProficiency(1);
+            $this->entityManager->persist($knowledge);
+        }
+
+        if ($defenderCombatant->isDefeated()) {
+            // already handled above
+        }
+
         $this->entityManager->persist($combat);
         $this->entityManager->persist($attackerCombatant);
         $this->entityManager->persist($defenderCombatant);
+        $this->entityManager->persist($attacker);
     }
 
     public function attack(LocalSession $session, LocalActor $attacker, int $targetActorId): void
@@ -258,6 +303,24 @@ final class CombatResolver
         }
 
         return max(1, $attackerKiControl - intdiv($defenderDurability, 2));
+    }
+
+    private function executorFor(TechniqueType $type): TechniqueExecutor
+    {
+        // Simple selection for now (no container wiring).
+        $executors = [
+            new BlastExecutor(),
+            new BeamExecutor(),
+            new ChargedExecutor(),
+        ];
+
+        foreach ($executors as $executor) {
+            if ($executor->supports($type)) {
+                return $executor;
+            }
+        }
+
+        throw new \LogicException(sprintf('No executor for technique type: %s', $type->value));
     }
 
     private function characterName(int $characterId): string
