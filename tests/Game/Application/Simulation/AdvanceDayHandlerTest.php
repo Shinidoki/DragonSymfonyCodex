@@ -9,6 +9,8 @@ use App\Game\Domain\Race;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingGrowthService;
 use App\Repository\CharacterRepository;
+use App\Repository\NpcProfileRepository;
+use App\Repository\WorldMapTileRepository;
 use App\Repository\WorldRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use PHPUnit\Framework\TestCase;
@@ -37,7 +39,19 @@ final class AdvanceDayHandlerTest extends TestCase
 
         $clock = new SimulationClock(new TrainingGrowthService());
 
-        $handler = new AdvanceDayHandler($worldRepository, $characterRepository, $clock, $entityManager);
+        $npcProfiles = $this->createMock(NpcProfileRepository::class);
+        $npcProfiles->expects(self::once())
+            ->method('findByWorld')
+            ->with($world)
+            ->willReturn([]);
+
+        $tiles = $this->createMock(WorldMapTileRepository::class);
+        $tiles->expects(self::once())
+            ->method('findBy')
+            ->with(['world' => $world, 'hasDojo' => true])
+            ->willReturn([]);
+
+        $handler = new AdvanceDayHandler($worldRepository, $characterRepository, $npcProfiles, $tiles, $clock, $entityManager);
 
         $beforeStrength = $character->getStrength();
 
@@ -70,7 +84,20 @@ final class AdvanceDayHandlerTest extends TestCase
         $entityManager->expects(self::once())->method('flush');
 
         $clock   = new SimulationClock(new TrainingGrowthService());
-        $handler = new AdvanceDayHandler($worldRepository, $characterRepository, $clock, $entityManager);
+
+        $npcProfiles = $this->createMock(NpcProfileRepository::class);
+        $npcProfiles->expects(self::once())
+            ->method('findByWorld')
+            ->with($world)
+            ->willReturn([]);
+
+        $tiles = $this->createMock(WorldMapTileRepository::class);
+        $tiles->expects(self::once())
+            ->method('findBy')
+            ->with(['world' => $world, 'hasDojo' => true])
+            ->willReturn([]);
+
+        $handler = new AdvanceDayHandler($worldRepository, $characterRepository, $npcProfiles, $tiles, $clock, $entityManager);
 
         $beforeStrength = $character->getStrength();
 

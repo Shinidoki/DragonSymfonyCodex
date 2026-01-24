@@ -4,10 +4,15 @@ namespace App\Game\Application\Local;
 
 use App\Entity\Character;
 use App\Entity\LocalSession;
+use App\Entity\NpcProfile;
 use App\Entity\World;
+use App\Entity\WorldMapTile;
+use App\Game\Domain\Map\TileCoord;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingIntensity;
 use App\Game\Domain\Training\TrainingContext;
+use App\Repository\NpcProfileRepository;
+use App\Repository\WorldMapTileRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class StartLongActionHandler
@@ -53,6 +58,25 @@ final class StartLongActionHandler
         /** @var list<Character> $characters */
         $characters = $this->entityManager->getRepository(Character::class)->findBy(['world' => $world]);
 
+        $profilesByCharacterId = [];
+        /** @var NpcProfileRepository $npcProfiles */
+        $npcProfiles = $this->entityManager->getRepository(NpcProfile::class);
+        foreach ($npcProfiles->findByWorld($world) as $profile) {
+            $id = $profile->getCharacter()->getId();
+            if ($id !== null) {
+                $profilesByCharacterId[(int)$id] = $profile;
+            }
+        }
+
+        /** @var WorldMapTileRepository $tiles */
+        $tiles = $this->entityManager->getRepository(WorldMapTile::class);
+        /** @var list<WorldMapTile> $dojoTiles */
+        $dojoTiles  = $tiles->findBy(['world' => $world, 'hasDojo' => true]);
+        $dojoCoords = array_map(
+            static fn(WorldMapTile $tile): TileCoord => new TileCoord($tile->getX(), $tile->getY()),
+            $dojoTiles,
+        );
+
         $multiplier = null;
         if ($type === LongActionType::Train) {
             $multiplier = $trainingContext->multiplier();
@@ -65,6 +89,8 @@ final class StartLongActionHandler
             intensity: TrainingIntensity::Normal,
             playerCharacterId: (int)$character->getId(),
             trainingMultiplier: $multiplier,
+            npcProfilesByCharacterId: $profilesByCharacterId,
+            dojoTiles: $dojoCoords,
         );
 
         $this->entityManager->flush();
@@ -75,4 +101,3 @@ final class StartLongActionHandler
         return new LongActionResult($world, $character, $session, $days);
     }
 }
-

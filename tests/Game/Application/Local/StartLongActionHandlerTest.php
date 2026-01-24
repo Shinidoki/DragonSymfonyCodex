@@ -5,11 +5,15 @@ namespace App\Tests\Game\Application\Local;
 use App\Entity\Character;
 use App\Entity\LocalActor;
 use App\Entity\LocalIntent;
+use App\Entity\NpcProfile;
 use App\Entity\World;
+use App\Entity\WorldMapTile;
 use App\Game\Application\Local\EnterLocalModeHandler;
 use App\Game\Application\Local\LongActionType;
 use App\Game\Application\Local\StartLongActionHandler;
 use App\Game\Domain\LocalNpc\IntentType;
+use App\Game\Domain\Map\Biome;
+use App\Game\Domain\Npc\NpcArchetype;
 use App\Game\Domain\Race;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingGrowthService;
@@ -116,5 +120,54 @@ final class StartLongActionHandlerTest extends KernelTestCase
         self::assertInstanceOf(LocalActor::class, $reloadedNpcActor);
         self::assertSame(0, $reloadedNpcActor->getX());
         self::assertSame(0, $reloadedNpcActor->getY());
+    }
+
+    public function testLongActionsAdvanceFighterNpcTowardNearestDojo(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $world = new World('seed-1');
+        $world->setMapSize(8, 8);
+
+        $player = new Character($world, 'Goku', Race::Saiyan);
+        $npc    = new Character($world, 'Tien', Race::Human);
+        $npc->setTilePosition(0, 0);
+
+        $dojo = new WorldMapTile($world, 2, 0, Biome::City);
+        $dojo->setHasSettlement(true);
+        $dojo->setHasDojo(true);
+
+        $npcProfile = new NpcProfile($npc, NpcArchetype::Fighter);
+
+        $entityManager->persist($world);
+        $entityManager->persist($player);
+        $entityManager->persist($npc);
+        $entityManager->persist($dojo);
+        $entityManager->persist($npcProfile);
+        $entityManager->flush();
+
+        $enter   = new EnterLocalModeHandler($entityManager);
+        $session = $enter->enter((int)$player->getId(), 8, 8);
+
+        $clock   = new SimulationClock(new TrainingGrowthService());
+        $handler = new StartLongActionHandler($entityManager, $clock);
+
+        $handler->start(
+            sessionId: (int)$session->getId(),
+            days: 1,
+            type: LongActionType::Train,
+            trainingContext: TrainingContext::Wilderness,
+        );
+
+        $entityManager->refresh($npc);
+
+        self::assertSame(1, $npc->getTileX());
+        self::assertSame(0, $npc->getTileY());
+        self::assertTrue($npc->hasTravelTarget());
+        self::assertSame(2, $npc->getTargetTileX());
+        self::assertSame(0, $npc->getTargetTileY());
     }
 }

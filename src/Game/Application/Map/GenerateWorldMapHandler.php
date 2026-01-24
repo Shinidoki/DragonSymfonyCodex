@@ -43,7 +43,11 @@ final class GenerateWorldMapHandler
 
         for ($y = 0; $y < $height; $y++) {
             for ($x = 0; $x < $width; $x++) {
-                $biome = $this->mapGenerator->biomeFor($world->getSeed(), new TileCoord($x, $y));
+                $coord = new TileCoord($x, $y);
+                $biome = $this->mapGenerator->biomeFor($world->getSeed(), $coord);
+
+                $hasSettlement = $this->mapGenerator->hasSettlementFor($world->getSeed(), $coord, $biome);
+                $hasDojo       = $this->mapGenerator->hasDojoFor($world->getSeed(), $coord, $hasSettlement);
 
                 $tile = $tileRepository->findOneBy([
                     'world' => $world,
@@ -53,13 +57,29 @@ final class GenerateWorldMapHandler
 
                 if (!$tile instanceof WorldMapTile) {
                     $tile = new WorldMapTile($world, $x, $y, $biome);
+                    $tile->setHasSettlement($hasSettlement);
+                    $tile->setHasDojo($hasDojo);
                     $this->entityManager->persist($tile);
                     $created++;
                     continue;
                 }
 
+                $didUpdate = false;
+
                 if ($tile->getBiome() !== $biome) {
                     $tile->setBiome($biome);
+                    $didUpdate = true;
+                }
+                if ($tile->hasSettlement() !== $hasSettlement) {
+                    $tile->setHasSettlement($hasSettlement);
+                    $didUpdate = true;
+                }
+                if ($tile->hasDojo() !== $hasDojo) {
+                    $tile->setHasDojo($hasDojo);
+                    $didUpdate = true;
+                }
+
+                if ($didUpdate) {
                     $updated++;
                 }
             }

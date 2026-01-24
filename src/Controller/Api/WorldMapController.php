@@ -38,7 +38,7 @@ final class WorldMapController extends AbstractController
             'y'             => $tile->getY(),
             'biome'         => $tile->getBiome()->value,
             'hasSettlement' => $tile->hasSettlement(),
+            'hasDojo' => $tile->hasDojo(),
         ]);
     }
 }
-
