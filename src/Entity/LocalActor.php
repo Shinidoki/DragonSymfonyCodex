@@ -3,6 +3,7 @@
 namespace App\Entity;
 
 use App\Game\Domain\Techniques\Prepared\PreparedTechniquePhase;
+use App\Game\Domain\Techniques\Prepared\PreparedTechniqueState;
 use App\Repository\LocalActorRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -47,6 +48,9 @@ class LocalActor
 
     #[ORM\Column(options: ['default' => 0])]
     private int $preparedTicksRemaining = 0;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $preparedSinceTick = 0;
 
     public function __construct(LocalSession $session, int $characterId, string $role, int $x, int $y)
     {
@@ -147,7 +151,26 @@ class LocalActor
         return $this->preparedTicksRemaining;
     }
 
-    public function startPreparingTechnique(string $techniqueCode, PreparedTechniquePhase $phase, int $ticksRemaining): void
+    public function getPreparedSinceTick(): int
+    {
+        return $this->preparedSinceTick;
+    }
+
+    public function getPreparedTechniqueState(): ?PreparedTechniqueState
+    {
+        if ($this->preparedTechniqueCode === null || $this->preparedPhase === null) {
+            return null;
+        }
+
+        return new PreparedTechniqueState(
+            techniqueCode: $this->preparedTechniqueCode,
+            phase: $this->preparedPhase,
+            ticksRemaining: $this->preparedTicksRemaining,
+            sinceTick: $this->preparedSinceTick,
+        );
+    }
+
+    public function startPreparingTechnique(string $techniqueCode, PreparedTechniquePhase $phase, int $ticksRemaining, int $sinceTick): void
     {
         $techniqueCode = strtolower(trim($techniqueCode));
         if ($techniqueCode === '') {
@@ -156,10 +179,14 @@ class LocalActor
         if ($ticksRemaining < 0) {
             throw new \InvalidArgumentException('ticksRemaining must be >= 0.');
         }
+        if ($sinceTick < 0) {
+            throw new \InvalidArgumentException('sinceTick must be >= 0.');
+        }
 
         $this->preparedTechniqueCode  = $techniqueCode;
         $this->preparedPhase          = $phase;
         $this->preparedTicksRemaining = $ticksRemaining;
+        $this->preparedSinceTick = $sinceTick;
     }
 
     public function decrementPreparedTick(): void
@@ -186,5 +213,6 @@ class LocalActor
         $this->preparedTechniqueCode  = null;
         $this->preparedPhase          = null;
         $this->preparedTicksRemaining = 0;
+        $this->preparedSinceTick = 0;
     }
 }

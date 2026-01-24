@@ -502,7 +502,7 @@ final class LocalTurnEngine
         $config      = $definition->getConfig();
         $chargeTicks = max(0, (int)($config['chargeTicks'] ?? 0));
 
-        $actor->startPreparingTechnique($definition->getCode(), PreparedTechniquePhase::Charging, $chargeTicks);
+        $actor->startPreparingTechnique($definition->getCode(), PreparedTechniquePhase::Charging, $chargeTicks, $session->getCurrentTick());
         (new LocalEventLog($this->entityManager))->record(
             $session,
             $actor->getX(),

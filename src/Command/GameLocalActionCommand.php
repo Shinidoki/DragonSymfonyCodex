@@ -2,12 +2,15 @@
 
 namespace App\Command;
 
+use App\Entity\TechniqueDefinition;
 use App\Game\Application\Local\ApplyLocalActionHandler;
 use App\Game\Application\Local\LocalEventLog;
 use App\Game\Domain\LocalMap\Direction;
 use App\Game\Domain\LocalMap\LocalAction;
 use App\Game\Domain\LocalMap\LocalActionType;
+use App\Game\Domain\Techniques\TechniqueType;
 use App\Game\Domain\Transformations\Transformation;
+use App\Repository\TechniqueDefinitionRepository;
 use Symfony\Component\Console\Attribute\AsCommand;
 use Symfony\Component\Console\Command\Command;
 use Symfony\Component\Console\Input\InputInterface;
@@ -23,6 +26,7 @@ final class GameLocalActionCommand extends Command
     public function __construct(
         private readonly ApplyLocalActionHandler $handler,
         private readonly LocalEventLog           $eventLog,
+        private readonly TechniqueDefinitionRepository $techniques,
     )
     {
         parent::__construct();
@@ -110,6 +114,20 @@ final class GameLocalActionCommand extends Command
             if ($aimCount > 1) {
                 $output->writeln('<error>Provide only one aim: --target OR --dir OR --x/--y</error>');
                 return Command::INVALID;
+            }
+
+            if ($aimCount === 0) {
+                $definition = $this->techniques->findEnabledByCode($techniqueCode);
+                if ($definition instanceof TechniqueDefinition && $definition->getType() !== TechniqueType::Charged) {
+                    $config   = $definition->getConfig();
+                    $aimModes = $config['aimModes'] ?? null;
+
+                    $allowed = is_array($aimModes) ? array_map('strtolower', $aimModes) : [];
+                    if (!in_array('self', $allowed, true)) {
+                        $output->writeln('<error>This technique requires an aim (--target OR --dir OR --x/--y)</error>');
+                        return Command::INVALID;
+                    }
+                }
             }
 
             if ($hasTarget) {

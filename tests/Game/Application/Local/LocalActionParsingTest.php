@@ -4,9 +4,11 @@ namespace App\Tests\Game\Application\Local;
 
 use App\Entity\Character;
 use App\Entity\LocalActor;
+use App\Entity\TechniqueDefinition;
 use App\Entity\World;
 use App\Game\Application\Local\EnterLocalModeHandler;
 use App\Game\Domain\Race;
+use App\Game\Domain\Techniques\TechniqueType;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\Console\Application;
@@ -247,5 +249,117 @@ final class LocalActionParsingTest extends KernelTestCase
         ]);
 
         self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function testTechniqueWithoutAimIsRejectedWhenTechniqueDoesNotSupportSelf(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $entityManager->persist(new TechniqueDefinition(
+            code: 'ki_blast',
+            name: 'Ki Blast',
+            type: TechniqueType::Blast,
+            config: [
+                'aimModes' => ['actor', 'dir', 'point'],
+                'delivery' => 'projectile',
+                'range'    => 2,
+                'kiCost'   => 3,
+                'piercing' => 'first',
+            ],
+            enabled: true,
+            version: 1,
+        ));
+        $entityManager->flush();
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'ki_blast',
+        ]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function testTechniqueWithoutAimIsAcceptedWhenTechniqueSupportsSelf(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $entityManager->persist(new TechniqueDefinition(
+            code: 'self_burst',
+            name: 'Self Burst',
+            type: TechniqueType::Blast,
+            config: [
+                'aimModes'  => ['self'],
+                'delivery'  => 'aoe',
+                'range'     => 0,
+                'kiCost'    => 0,
+                'aoeRadius' => 1,
+            ],
+            enabled: true,
+            version: 1,
+        ));
+        $entityManager->flush();
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'self_burst',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testChargedTechniqueWithoutAimIsAcceptedEvenWhenItDoesNotSupportSelf(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $entityManager->persist(new TechniqueDefinition(
+            code: 'kamehameha',
+            name: 'Kamehameha',
+            type: TechniqueType::Charged,
+            config: [
+                'aimModes'    => ['actor', 'dir', 'point'],
+                'delivery'    => 'ray',
+                'piercing'    => 'all',
+                'range'       => 4,
+                'kiCost'      => 12,
+                'chargeTicks' => 2,
+            ],
+            enabled: true,
+            version: 1,
+        ));
+        $entityManager->flush();
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'kamehameha',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
     }
 }
