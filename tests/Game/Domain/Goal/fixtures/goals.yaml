@@ -1,0 +1,19 @@
+life_goals:
+    fighter.become_strongest:
+        label: Become the strongest
+        current_goal_pool:
+            -   code: goal.train_in_dojo
+                weight: 1
+
+current_goals:
+    goal.train_in_dojo:
+        label: Train in the dojo
+        interruptible: false
+        defaults:
+            target_days: 7
+
+npc_life_goals:
+    fighter:
+        -   code: fighter.become_strongest
+            weight: 1
+

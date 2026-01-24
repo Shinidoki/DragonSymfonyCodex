@@ -3,6 +3,7 @@
 namespace App\Game\Application\World;
 
 use App\Entity\Character;
+use App\Entity\CharacterGoal;
 use App\Entity\NpcProfile;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
@@ -19,6 +20,7 @@ final class PopulateWorldHandler
         private readonly WorldRepository        $worldRepository,
         private readonly WorldMapTileRepository $tiles,
         private readonly NpcProfileRepository   $npcProfiles,
+        private readonly NpcLifeGoalPicker $lifeGoalPicker,
         private readonly EntityManagerInterface $entityManager,
     )
     {
@@ -68,8 +70,12 @@ final class PopulateWorldHandler
 
             $profile = new NpcProfile($character, $archetype);
 
+            $goals = new CharacterGoal($character);
+            $goals->setLifeGoalCode($this->lifeGoalPicker->pickForArchetype($archetype->value));
+
             $this->entityManager->persist($character);
             $this->entityManager->persist($profile);
+            $this->entityManager->persist($goals);
 
             $createdByArchetype[$archetype->value]++;
         }
@@ -135,4 +141,3 @@ final class PopulateWorldHandler
         return (int)hexdec(substr($hash, 0, 8));
     }
 }
-

@@ -1,0 +1,55 @@
+# Minimal catalog placeholder.
+#
+# This file will be expanded as goals + event rules are implemented.
+
+life_goals:
+    civilian.have_family:
+        label: Have a family
+        current_goal_pool:
+            -   code: goal.earn_money
+                weight: 1
+    fighter.become_strongest:
+        label: Become the strongest
+        current_goal_pool:
+            -   code: goal.train_in_dojo
+                weight: 1
+            -   code: goal.participate_tournament
+                weight: 1
+    wanderer.see_the_world:
+        label: See the world
+        current_goal_pool:
+            -   code: goal.wander
+                weight: 1
+
+current_goals:
+    goal.earn_money:
+        label: Earn money
+        interruptible: true
+        defaults:
+            target_amount: 100
+        handler: App\Game\Domain\Goal\Handlers\EarnMoneyGoalHandler
+    goal.train_in_dojo:
+        label: Train in the dojo
+        interruptible: false
+        defaults:
+            target_days: 7
+        handler: App\Game\Domain\Goal\Handlers\TrainInDojoGoalHandler
+    goal.participate_tournament:
+        label: Participate in a tournament
+        interruptible: true
+        handler: App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler
+    goal.wander:
+        label: Wander
+        interruptible: true
+        handler: App\Game\Domain\Goal\Handlers\WanderGoalHandler
+
+npc_life_goals:
+    civilian:
+        -   code: civilian.have_family
+            weight: 1
+    fighter:
+        -   code: fighter.become_strongest
+            weight: 1
+    wanderer:
+        -   code: wanderer.see_the_world
+            weight: 1

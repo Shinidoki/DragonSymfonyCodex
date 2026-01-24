@@ -3,6 +3,7 @@
 namespace App\Tests\Game\Application\World;
 
 use App\Entity\Character;
+use App\Entity\CharacterGoal;
 use App\Entity\NpcProfile;
 use App\Entity\World;
 use App\Game\Application\Map\GenerateWorldMapHandler;
@@ -44,6 +45,13 @@ final class PopulateWorldHandlerTest extends KernelTestCase
 
         self::assertSame(10, $entityManager->getRepository(Character::class)->count(['world' => $world]));
         self::assertSame(10, $entityManager->getRepository(NpcProfile::class)->count([]));
+        self::assertSame(10, $entityManager->getRepository(CharacterGoal::class)->count([]));
+
+        /** @var list<CharacterGoal> $goals */
+        $goals = $entityManager->getRepository(CharacterGoal::class)->findAll();
+        foreach ($goals as $goal) {
+            self::assertNotSame('', trim((string)$goal->getLifeGoalCode()));
+        }
 
         /** @var list<Character> $characters */
         $characters = $entityManager->getRepository(Character::class)->findBy(['world' => $world]);
@@ -57,4 +65,3 @@ final class PopulateWorldHandlerTest extends KernelTestCase
         }
     }
 }
-

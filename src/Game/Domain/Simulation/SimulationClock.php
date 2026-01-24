@@ -3,8 +3,14 @@
 namespace App\Game\Domain\Simulation;
 
 use App\Entity\Character;
+use App\Entity\CharacterEvent;
+use App\Entity\CharacterGoal;
 use App\Entity\NpcProfile;
 use App\Entity\World;
+use App\Game\Domain\Goal\CharacterGoalResolver;
+use App\Game\Domain\Goal\GoalCatalog;
+use App\Game\Domain\Goal\GoalContext;
+use App\Game\Domain\Goal\GoalPlanner;
 use App\Game\Domain\Map\TileCoord;
 use App\Game\Domain\Map\Travel\StepTowardTarget;
 use App\Game\Domain\Npc\DailyActivity;
@@ -22,6 +28,8 @@ final class SimulationClock
         private readonly ?DailyPlanner         $dailyPlanner = null,
         private readonly ?StepTowardTarget     $stepTowardTarget = null,
         private readonly ?TransformationService $transformationService = null,
+        private readonly ?CharacterGoalResolver $goalResolver = null,
+        private readonly ?GoalPlanner           $goalPlanner = null,
     )
     {
     }
@@ -30,6 +38,8 @@ final class SimulationClock
      * @param list<Character> $characters
      * @param array<int,NpcProfile> $npcProfilesByCharacterId
      * @param list<TileCoord>       $dojoTiles
+     * @param array<int,CharacterGoal> $goalsByCharacterId
+     * @param list<CharacterEvent>     $events
      */
     public function advanceDays(
         World             $world,
@@ -38,6 +48,9 @@ final class SimulationClock
         TrainingIntensity $intensity,
         array             $npcProfilesByCharacterId = [],
         array             $dojoTiles = [],
+        array        $goalsByCharacterId = [],
+        array        $events = [],
+        ?GoalCatalog $goalCatalog = null,
     ): void
     {
         if ($days < 0) {
@@ -47,6 +60,7 @@ final class SimulationClock
         $planner = $this->dailyPlanner ?? new DailyPlanner();
         $stepper = $this->stepTowardTarget ?? new StepTowardTarget();
         $transformations = $this->transformationService ?? new TransformationService();
+        $goalResolver = $this->goalResolver ?? new CharacterGoalResolver();
 
         $dojoIndex = $this->buildDojoIndex($dojoTiles);
 
@@ -61,7 +75,38 @@ final class SimulationClock
                     $profile = $npcProfilesByCharacterId[(int)$character->getId()] ?? null;
                 }
 
-                $plan = $planner->planFor($character, $profile, $dojoTiles);
+                $plan = null;
+
+                $goal = null;
+                if ($goalCatalog instanceof GoalCatalog && $character->getId() !== null) {
+                    $goal = $goalsByCharacterId[(int)$character->getId()] ?? null;
+                }
+
+                if ($goal instanceof CharacterGoal && $goalCatalog instanceof GoalCatalog) {
+                    $goalResolver->resolveForDay($character, $goal, $goalCatalog, $world->getCurrentDay(), $events);
+
+                    if ($this->goalPlanner instanceof GoalPlanner) {
+                        $currentGoalCode = $goal->getCurrentGoalCode();
+                        if ($currentGoalCode !== null && !$goal->isCurrentGoalComplete()) {
+                            $result = $this->goalPlanner->step(
+                                character: $character,
+                                world: $world,
+                                currentGoalCode: $currentGoalCode,
+                                data: $goal->getCurrentGoalData() ?? [],
+                                context: new GoalContext($dojoTiles),
+                                catalog: $goalCatalog,
+                            );
+
+                            $goal->setCurrentGoalData($result->data);
+                            $goal->setCurrentGoalComplete($result->completed);
+                            $plan = $result->plan;
+                        }
+                    }
+                }
+
+                if ($plan === null) {
+                    $plan = $planner->planFor($character, $profile, $dojoTiles);
+                }
 
                 if ($plan->activity === DailyActivity::Train) {
                     $multiplier = isset($dojoIndex[sprintf('%d:%d', $character->getTileX(), $character->getTileY())])
@@ -106,6 +151,8 @@ final class SimulationClock
      * @param list<Character> $characters
      * @param array<int,NpcProfile> $npcProfilesByCharacterId
      * @param list<TileCoord>       $dojoTiles
+     * @param array<int,CharacterGoal> $goalsByCharacterId
+     * @param list<CharacterEvent>     $events
      */
     public function advanceDaysForLongAction(
         World             $world,
@@ -116,6 +163,9 @@ final class SimulationClock
         ?float            $trainingMultiplier,
         array $npcProfilesByCharacterId = [],
         array $dojoTiles = [],
+        array        $goalsByCharacterId = [],
+        array        $events = [],
+        ?GoalCatalog $goalCatalog = null,
     ): void
     {
         if ($days < 0) {
@@ -131,6 +181,7 @@ final class SimulationClock
         $planner = $this->dailyPlanner ?? new DailyPlanner();
         $stepper = $this->stepTowardTarget ?? new StepTowardTarget();
         $transformations = $this->transformationService ?? new TransformationService();
+        $goalResolver = $this->goalResolver ?? new CharacterGoalResolver();
 
         $dojoIndex = $this->buildDojoIndex($dojoTiles);
 
@@ -155,7 +206,38 @@ final class SimulationClock
                     $profile = $npcProfilesByCharacterId[(int)$character->getId()] ?? null;
                 }
 
-                $plan = $planner->planFor($character, $profile, $dojoTiles);
+                $plan = null;
+
+                $goal = null;
+                if ($goalCatalog instanceof GoalCatalog && $character->getId() !== null) {
+                    $goal = $goalsByCharacterId[(int)$character->getId()] ?? null;
+                }
+
+                if ($goal instanceof CharacterGoal && $goalCatalog instanceof GoalCatalog) {
+                    $goalResolver->resolveForDay($character, $goal, $goalCatalog, $world->getCurrentDay(), $events);
+
+                    if ($this->goalPlanner instanceof GoalPlanner) {
+                        $currentGoalCode = $goal->getCurrentGoalCode();
+                        if ($currentGoalCode !== null && !$goal->isCurrentGoalComplete()) {
+                            $result = $this->goalPlanner->step(
+                                character: $character,
+                                world: $world,
+                                currentGoalCode: $currentGoalCode,
+                                data: $goal->getCurrentGoalData() ?? [],
+                                context: new GoalContext($dojoTiles),
+                                catalog: $goalCatalog,
+                            );
+
+                            $goal->setCurrentGoalData($result->data);
+                            $goal->setCurrentGoalComplete($result->completed);
+                            $plan = $result->plan;
+                        }
+                    }
+                }
+
+                if ($plan === null) {
+                    $plan = $planner->planFor($character, $profile, $dojoTiles);
+                }
 
                 if ($plan->activity === DailyActivity::Train) {
                     $multiplier = isset($dojoIndex[sprintf('%d:%d', $character->getTileX(), $character->getTileY())])

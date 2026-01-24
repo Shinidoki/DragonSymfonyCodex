@@ -3,15 +3,20 @@
 namespace App\Game\Application\Local;
 
 use App\Entity\Character;
+use App\Entity\CharacterEvent;
+use App\Entity\CharacterGoal;
 use App\Entity\LocalSession;
 use App\Entity\NpcProfile;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
+use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Domain\Map\TileCoord;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingIntensity;
 use App\Game\Domain\Training\TrainingContext;
 use App\Repository\NpcProfileRepository;
+use App\Repository\CharacterEventRepository;
+use App\Repository\CharacterGoalRepository;
 use App\Repository\WorldMapTileRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -20,6 +25,7 @@ final class StartLongActionHandler
     public function __construct(
         private readonly EntityManagerInterface $entityManager,
         private readonly SimulationClock        $clock,
+        private readonly ?GoalCatalogProviderInterface $goalCatalogProvider = null,
     )
     {
     }
@@ -77,6 +83,27 @@ final class StartLongActionHandler
             $dojoTiles,
         );
 
+        $goalsByCharacterId = [];
+        $events             = [];
+        $catalog            = null;
+
+        if ($this->goalCatalogProvider instanceof GoalCatalogProviderInterface) {
+            /** @var CharacterGoalRepository $goalRepo */
+            $goalRepo = $this->entityManager->getRepository(CharacterGoal::class);
+            foreach ($goalRepo->findByWorld($world) as $goal) {
+                $id = $goal->getCharacter()->getId();
+                if ($id !== null) {
+                    $goalsByCharacterId[(int)$id] = $goal;
+                }
+            }
+
+            /** @var CharacterEventRepository $eventRepo */
+            $eventRepo = $this->entityManager->getRepository(CharacterEvent::class);
+            $events    = $eventRepo->findByWorldUpToDay($world, $world->getCurrentDay() + $days);
+
+            $catalog = $this->goalCatalogProvider->get();
+        }
+
         $multiplier = null;
         if ($type === LongActionType::Train) {
             $multiplier = $trainingContext->multiplier();
@@ -91,6 +118,9 @@ final class StartLongActionHandler
             trainingMultiplier: $multiplier,
             npcProfilesByCharacterId: $profilesByCharacterId,
             dojoTiles: $dojoCoords,
+            goalsByCharacterId: $goalsByCharacterId,
+            events: $events,
+            goalCatalog: $catalog,
         );
 
         $this->entityManager->flush();
