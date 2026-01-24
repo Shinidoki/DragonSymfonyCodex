@@ -5,7 +5,7 @@ namespace App\Game\Domain\Goal;
 /**
  * @phpstan-type CurrentGoalPoolItem array{code:string,weight:int}
  * @phpstan-type LifeGoalDef array{label?:string,current_goal_pool:list<CurrentGoalPoolItem>}
- * @phpstan-type CurrentGoalDef array{label?:string,interruptible:bool,defaults?:array<string,mixed>,handler?:string}
+ * @phpstan-type CurrentGoalDef array{label?:string,interruptible:bool,defaults?:array<string,mixed>,handler?:string,work_focus_target?:int}
  */
 final readonly class GoalCatalog
 {
@@ -134,5 +134,23 @@ final readonly class GoalCatalog
         }
 
         return $handler;
+    }
+
+    public function currentGoalWorkFocusTarget(string $currentGoalCode): ?int
+    {
+        $def = $this->currentGoals[$currentGoalCode] ?? null;
+        if (!is_array($def)) {
+            throw new \InvalidArgumentException(sprintf('Unknown current goal: %s', $currentGoalCode));
+        }
+
+        $target = $def['work_focus_target'] ?? null;
+        if ($target === null) {
+            return null;
+        }
+        if (!is_int($target) || $target < 0 || $target > 100) {
+            throw new \InvalidArgumentException(sprintf('Current goal work_focus_target must be an integer 0..100: %s', $currentGoalCode));
+        }
+
+        return $target;
     }
 }

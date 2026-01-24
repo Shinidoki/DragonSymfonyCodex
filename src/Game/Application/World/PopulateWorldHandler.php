@@ -7,6 +7,7 @@ use App\Entity\CharacterGoal;
 use App\Entity\NpcProfile;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
+use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Domain\Npc\NpcArchetype;
 use App\Game\Domain\Race;
 use App\Repository\NpcProfileRepository;
@@ -21,6 +22,7 @@ final class PopulateWorldHandler
         private readonly WorldMapTileRepository $tiles,
         private readonly NpcProfileRepository   $npcProfiles,
         private readonly NpcLifeGoalPicker $lifeGoalPicker,
+        private readonly EconomyCatalogProviderInterface $economyCatalogProvider,
         private readonly EntityManagerInterface $entityManager,
     )
     {
@@ -47,9 +49,12 @@ final class PopulateWorldHandler
 
         /** @var list<WorldMapTile> $settlements */
         $settlements = $this->tiles->findBy(['world' => $world, 'hasSettlement' => true]);
+        usort($settlements, static fn(WorldMapTile $a, WorldMapTile $b): int => [$a->getX(), $a->getY()] <=> [$b->getX(), $b->getY()]);
 
         /** @var list<WorldMapTile> $dojos */
         $dojos = $this->tiles->findBy(['world' => $world, 'hasDojo' => true]);
+
+        $economy = $this->economyCatalogProvider->get();
 
         $createdByArchetype = [
             NpcArchetype::Civilian->value => 0,
@@ -68,10 +73,16 @@ final class PopulateWorldHandler
             $character = new Character($world, $name, $race);
             $character->setTilePosition($x, $y);
 
+            $jobCode = $economy->pickJobForArchetype($world->getSeed(), $index, $archetype->value);
+            if ($jobCode !== null && $settlements !== []) {
+                $employer = $settlements[$this->hashInt(sprintf('%s:employer:%d', $world->getSeed(), $index)) % count($settlements)];
+                $character->setEmployment($jobCode, $employer->getX(), $employer->getY());
+            }
+
             $profile = new NpcProfile($character, $archetype);
 
             $goals = new CharacterGoal($character);
-            $goals->setLifeGoalCode($this->lifeGoalPicker->pickForArchetype($archetype->value));
+            $goals->setLifeGoalCode($this->lifeGoalPicker->pickForArchetype($world->getSeed(), $index, $archetype->value));
 
             $this->entityManager->persist($character);
             $this->entityManager->persist($profile);

@@ -11,8 +11,16 @@ final class NpcLifeGoalPicker
     {
     }
 
-    public function pickForArchetype(string $npcArchetype): string
+    public function pickForArchetype(string $worldSeed, int $index, string $npcArchetype): string
     {
+        $worldSeed = trim($worldSeed);
+        if ($worldSeed === '') {
+            throw new \InvalidArgumentException('worldSeed must not be empty.');
+        }
+        if ($index <= 0) {
+            throw new \InvalidArgumentException('index must be a positive integer.');
+        }
+
         $npcArchetype = strtolower(trim($npcArchetype));
         if ($npcArchetype === '') {
             throw new \InvalidArgumentException('npcArchetype must not be empty.');
@@ -35,7 +43,7 @@ final class NpcLifeGoalPicker
             $total += $weight;
         }
 
-        $roll = random_int(1, $total);
+        $roll = ($this->hashInt(sprintf('%s:npc-life-goal:%s:%d', $worldSeed, $npcArchetype, $index)) % $total) + 1;
         foreach ($pool as $item) {
             $roll -= $item['weight'];
             if ($roll <= 0) {
@@ -57,5 +65,12 @@ final class NpcLifeGoalPicker
     private function getCatalog(): GoalCatalog
     {
         return $this->catalogProvider->get();
+    }
+
+    private function hashInt(string $input): int
+    {
+        $hash = hash('sha256', $input);
+
+        return (int)hexdec(substr($hash, 0, 8));
     }
 }

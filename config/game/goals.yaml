@@ -8,10 +8,16 @@ life_goals:
         current_goal_pool:
             -   code: goal.earn_money
                 weight: 1
+            -   code: goal.find_job
+                weight: 1
     civilian.organize_events:
         label: Organize events
         current_goal_pool:
             -   code: goal.organize_tournament
+                weight: 1
+            -   code: goal.earn_money
+                weight: 1
+            -   code: goal.find_job
                 weight: 1
     fighter.become_strongest:
         label: Become the strongest
@@ -20,39 +26,57 @@ life_goals:
                 weight: 1
             -   code: goal.participate_tournament
                 weight: 1
+            -   code: goal.earn_money
+                weight: 1
+            -   code: goal.find_job
+                weight: 1
     wanderer.see_the_world:
         label: See the world
         current_goal_pool:
             -   code: goal.wander
+                weight: 1
+            -   code: goal.earn_money
+                weight: 1
+            -   code: goal.find_job
                 weight: 1
 
 current_goals:
     goal.earn_money:
         label: Earn money
         interruptible: true
+        work_focus_target: 90
         defaults:
             target_amount: 100
         handler: App\Game\Domain\Goal\Handlers\EarnMoneyGoalHandler
     goal.train_in_dojo:
         label: Train in the dojo
         interruptible: false
+        work_focus_target: 10
         defaults:
             target_days: 7
         handler: App\Game\Domain\Goal\Handlers\TrainInDojoGoalHandler
     goal.participate_tournament:
         label: Participate in a tournament
         interruptible: true
+        work_focus_target: 0
         handler: App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler
     goal.organize_tournament:
         label: Organize a tournament
         interruptible: true
+        work_focus_target: 60
         defaults:
             radius: 5
         handler: App\Game\Domain\Goal\Handlers\OrganizeTournamentGoalHandler
     goal.wander:
         label: Wander
         interruptible: true
+        work_focus_target: 40
         handler: App\Game\Domain\Goal\Handlers\WanderGoalHandler
+    goal.find_job:
+        label: Find a job
+        interruptible: true
+        work_focus_target: 80
+        handler: App\Game\Domain\Goal\Handlers\FindJobGoalHandler
 
 npc_life_goals:
     civilian:
@@ -72,3 +96,39 @@ event_rules:
                 chance: 0.0
                 set_current_goal:
                     code: goal.participate_tournament
+    money_low_employed:
+        from:
+            civilian.have_family:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.earn_money
+            civilian.organize_events:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.earn_money
+            fighter.become_strongest:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.earn_money
+            wanderer.see_the_world:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.earn_money
+    money_low_unemployed:
+        from:
+            civilian.have_family:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
+            civilian.organize_events:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
+            fighter.become_strongest:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
+            wanderer.see_the_world:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job

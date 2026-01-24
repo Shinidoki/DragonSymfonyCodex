@@ -47,9 +47,20 @@ final class GameSimAdvanceCommand extends Command
         $output->writeln(sprintf('World #%d advanced by %d day(s) to day %d.', (int)$result->world->getId(), $result->daysAdvanced, $result->world->getCurrentDay()));
 
         foreach ($result->characters as $character) {
+            $job = $character->isEmployed()
+                ? sprintf(
+                    '%s @ (%d,%d)',
+                    (string)$character->getEmploymentJobCode(),
+                    (int)$character->getEmploymentSettlementX(),
+                    (int)$character->getEmploymentSettlementY(),
+                )
+                : 'unemployed';
+
             $output->writeln(sprintf(
-                '- %s: STR %s (%d), KI-CONTROL %s (%d)',
+                '- %s: $%d, job %s, STR %s (%d), KI-CONTROL %s (%d)',
                 $character->getName(),
+                $character->getMoney(),
+                $job,
                 StatTier::fromValue($character->getStrength())->label(),
                 $character->getStrength(),
                 StatTier::fromValue($character->getKiControl())->label(),
@@ -60,4 +71,3 @@ final class GameSimAdvanceCommand extends Command
         return Command::SUCCESS;
     }
 }
-

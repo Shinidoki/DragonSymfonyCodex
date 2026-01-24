@@ -38,6 +38,24 @@ class Character
     #[ORM\Column(options: ['default' => 0])]
     private int $tileY = 0;
 
+    #[ORM\Column(options: ['default' => 0])]
+    private int $money = 0;
+
+    #[ORM\Column(options: ['default' => 0])]
+    private int $influence = 0;
+
+    #[ORM\Column(options: ['default' => 50])]
+    private int $workFocus = 50;
+
+    #[ORM\Column(length: 64, nullable: true)]
+    private ?string $employmentJobCode = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $employmentSettlementX = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $employmentSettlementY = null;
+
     #[ORM\Column(nullable: true)]
     private ?int $targetTileX = null;
 
@@ -129,6 +147,97 @@ class Character
     public function getTileY(): int
     {
         return $this->tileY;
+    }
+
+    public function getMoney(): int
+    {
+        return $this->money;
+    }
+
+    public function addMoney(int $amount): void
+    {
+        $next = $this->money + $amount;
+        if ($next < 0) {
+            $next = 0;
+        }
+
+        $this->money = $next;
+    }
+
+    public function getInfluence(): int
+    {
+        return $this->influence;
+    }
+
+    public function addInfluence(int $amount): void
+    {
+        $next = $this->influence + $amount;
+        if ($next < 0) {
+            $next = 0;
+        }
+
+        $this->influence = $next;
+    }
+
+    /**
+     * Work focus is a 0..100 slider used to split daily work vs other splittable activities.
+     */
+    public function getWorkFocus(): int
+    {
+        return $this->workFocus;
+    }
+
+    public function setWorkFocus(int $workFocus): void
+    {
+        if ($workFocus < 0 || $workFocus > 100) {
+            throw new \InvalidArgumentException('workFocus must be between 0 and 100.');
+        }
+
+        $this->workFocus = $workFocus;
+    }
+
+    public function getEmploymentJobCode(): ?string
+    {
+        return $this->employmentJobCode;
+    }
+
+    public function getEmploymentSettlementX(): ?int
+    {
+        return $this->employmentSettlementX;
+    }
+
+    public function getEmploymentSettlementY(): ?int
+    {
+        return $this->employmentSettlementY;
+    }
+
+    public function isEmployed(): bool
+    {
+        return $this->employmentJobCode !== null
+            && $this->employmentSettlementX !== null
+            && $this->employmentSettlementY !== null;
+    }
+
+    public function setEmployment(string $jobCode, int $settlementX, int $settlementY): void
+    {
+        $jobCode = trim($jobCode);
+        if ($jobCode === '') {
+            throw new \InvalidArgumentException('jobCode must not be empty.');
+        }
+        if ($settlementX < 0 || $settlementY < 0) {
+            throw new \InvalidArgumentException('Settlement coordinates must be >= 0.');
+        }
+
+        $this->employmentJobCode     = $jobCode;
+        $this->employmentSettlementX = $settlementX;
+        $this->employmentSettlementY = $settlementY;
+    }
+
+    public function clearEmployment(): void
+    {
+        $this->employmentJobCode     = null;
+        $this->employmentSettlementX = null;
+        $this->employmentSettlementY = null;
     }
 
     public function setTilePosition(int $x, int $y): void

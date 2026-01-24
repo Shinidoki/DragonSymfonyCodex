@@ -207,6 +207,17 @@ final readonly class CharacterGoalResolver
     private function applyCurrentGoalOverrides(CharacterGoal $goal, array $rule, GoalCatalog $catalog, CharacterEvent $event): void
     {
         $currentGoalCode = $goal->getCurrentGoalCode();
+
+        // "Low money" is meant as a fallback when the character is idle/available.
+        // It should not interrupt active, in-progress goals (e.g. tournaments) on the same resolution pass.
+        if (
+            ($event->getType() === 'money_low_employed' || $event->getType() === 'money_low_unemployed')
+            && $currentGoalCode !== null
+            && !$goal->isCurrentGoalComplete()
+        ) {
+            return;
+        }
+
         $canInterrupt    = $currentGoalCode === null || $goal->isCurrentGoalComplete();
         if (!$canInterrupt && $currentGoalCode !== null) {
             $canInterrupt = $catalog->currentGoalInterruptible($currentGoalCode);

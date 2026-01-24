@@ -157,6 +157,12 @@ final class GoalCatalogLoader
             if (array_key_exists('defaults', $def) && $def['defaults'] !== null && !is_array($def['defaults'])) {
                 throw new \InvalidArgumentException(sprintf('current_goal %s defaults must be a mapping when provided.', $currentGoalCode));
             }
+            if (array_key_exists('work_focus_target', $def) && $def['work_focus_target'] !== null) {
+                $target = $def['work_focus_target'];
+                if (!is_int($target) || $target < 0 || $target > 100) {
+                    throw new \InvalidArgumentException(sprintf('current_goal %s work_focus_target must be an integer 0..100 when provided.', $currentGoalCode));
+                }
+            }
         }
 
         // Ensure referenced current goals exist.
