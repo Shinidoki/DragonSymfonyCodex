@@ -1,0 +1,20 @@
+life_goals:
+    fighter.become_strongest:
+        label: Become the strongest
+        current_goal_pool:
+            -   code: goal.idle
+                weight: 1
+
+current_goals:
+    goal.idle:
+        label: Idle
+        interruptible: true
+
+event_rules:
+    tournament_announced:
+        from:
+            fighter.become_strongest:
+                set_current_goal:
+                    code: goal.idle
+                    chance: definitely
+

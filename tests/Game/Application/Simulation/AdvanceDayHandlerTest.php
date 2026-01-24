@@ -5,17 +5,17 @@ namespace App\Tests\Game\Application\Simulation;
 use App\Entity\Character;
 use App\Entity\CharacterGoal;
 use App\Entity\World;
-use App\Game\Application\Simulation\AdvanceDayHandler;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
-use App\Game\Domain\Race;
-use App\Game\Domain\Simulation\SimulationClock;
+use App\Game\Application\Simulation\AdvanceDayHandler;
 use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Goal\GoalPlanner;
 use App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler;
+use App\Game\Domain\Race;
+use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingGrowthService;
-use App\Repository\CharacterRepository;
-use App\Repository\CharacterGoalRepository;
 use App\Repository\CharacterEventRepository;
+use App\Repository\CharacterGoalRepository;
+use App\Repository\CharacterRepository;
 use App\Repository\NpcProfileRepository;
 use App\Repository\WorldMapTileRepository;
 use App\Repository\WorldRepository;
@@ -162,7 +162,7 @@ final class AdvanceDayHandlerTest extends TestCase
         $characterEvents = $this->createMock(CharacterEventRepository::class);
         $characterEvents->expects(self::once())
             ->method('findByWorldUpToDay')
-            ->with($world, 1)
+            ->with($world, 0)
             ->willReturn([]);
 
         $catalog = new GoalCatalog(

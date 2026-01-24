@@ -105,6 +105,9 @@ final class GoalCatalogLoader
                     if (!is_string($code) || trim($code) === '') {
                         throw new \InvalidArgumentException(sprintf('event_rule %s from.%s set_current_goal.code must be a non-empty string.', $eventType, $lifeGoalCode));
                     }
+                    if (array_key_exists('chance', $set) && $set['chance'] !== null && !is_float($set['chance']) && !is_int($set['chance'])) {
+                        throw new \InvalidArgumentException(sprintf('event_rule %s from.%s set_current_goal.chance must be a number when provided.', $eventType, $lifeGoalCode));
+                    }
                     if (array_key_exists('data', $set) && $set['data'] !== null && !is_array($set['data'])) {
                         throw new \InvalidArgumentException(sprintf('event_rule %s from.%s set_current_goal.data must be a mapping when provided.', $eventType, $lifeGoalCode));
                     }

@@ -14,9 +14,9 @@ use App\Game\Domain\Map\TileCoord;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingIntensity;
 use App\Game\Domain\Training\TrainingContext;
-use App\Repository\NpcProfileRepository;
 use App\Repository\CharacterEventRepository;
 use App\Repository\CharacterGoalRepository;
+use App\Repository\NpcProfileRepository;
 use App\Repository\WorldMapTileRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
@@ -99,9 +99,41 @@ final class StartLongActionHandler
 
             /** @var CharacterEventRepository $eventRepo */
             $eventRepo = $this->entityManager->getRepository(CharacterEvent::class);
-            $events    = $eventRepo->findByWorldUpToDay($world, $world->getCurrentDay() + $days);
-
             $catalog = $this->goalCatalogProvider->get();
+
+            $multiplier = null;
+            if ($type === LongActionType::Train) {
+                $multiplier = $trainingContext->multiplier();
+            }
+
+            for ($i = 0; $i < $days; $i++) {
+                $events = $eventRepo->findByWorldUpToDay($world, $world->getCurrentDay());
+
+                $emitted = $this->clock->advanceDaysForLongAction(
+                    world: $world,
+                    characters: $characters,
+                    days: 1,
+                    intensity: TrainingIntensity::Normal,
+                    playerCharacterId: (int)$character->getId(),
+                    trainingMultiplier: $multiplier,
+                    npcProfilesByCharacterId: $profilesByCharacterId,
+                    dojoTiles: $dojoCoords,
+                    goalsByCharacterId: $goalsByCharacterId,
+                    events: $events,
+                    goalCatalog: $catalog,
+                );
+
+                foreach ($emitted as $event) {
+                    $this->entityManager->persist($event);
+                }
+
+                $this->entityManager->flush();
+            }
+
+            $session->resume();
+            $this->entityManager->flush();
+
+            return new LongActionResult($world, $character, $session, $days);
         }
 
         $multiplier = null;

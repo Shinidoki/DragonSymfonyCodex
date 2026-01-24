@@ -8,9 +8,9 @@ use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Domain\Map\TileCoord;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingIntensity;
-use App\Repository\CharacterRepository;
-use App\Repository\CharacterGoalRepository;
 use App\Repository\CharacterEventRepository;
+use App\Repository\CharacterGoalRepository;
+use App\Repository\CharacterRepository;
 use App\Repository\NpcProfileRepository;
 use App\Repository\WorldMapTileRepository;
 use App\Repository\WorldRepository;
@@ -78,7 +78,30 @@ final class AdvanceDayHandler
             }
 
             $catalog = $this->goalCatalogProvider->get();
-            $events  = $this->characterEvents->findByWorldUpToDay($world, $world->getCurrentDay() + $days);
+
+            for ($i = 0; $i < $days; $i++) {
+                $events = $this->characterEvents->findByWorldUpToDay($world, $world->getCurrentDay());
+
+                $emitted = $this->clock->advanceDays(
+                    world: $world,
+                    characters: $characters,
+                    days: 1,
+                    intensity: TrainingIntensity::Normal,
+                    npcProfilesByCharacterId: $profilesByCharacterId,
+                    dojoTiles: $dojoCoords,
+                    goalsByCharacterId: $goalsByCharacterId,
+                    events: $events,
+                    goalCatalog: $catalog,
+                );
+
+                foreach ($emitted as $event) {
+                    $this->entityManager->persist($event);
+                }
+
+                $this->entityManager->flush();
+            }
+
+            return new AdvanceDayResult($world, $characters, $days);
         }
 
         $this->clock->advanceDays(

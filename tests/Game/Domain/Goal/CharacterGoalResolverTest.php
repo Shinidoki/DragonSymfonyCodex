@@ -13,6 +13,50 @@ use PHPUnit\Framework\TestCase;
 
 final class CharacterGoalResolverTest extends TestCase
 {
+    public function testIgnoresEventsFromTheSameDay(): void
+    {
+        $world     = new World('seed-1');
+        $character = new Character($world, 'NPC-0001', Race::Human);
+
+        $goal = new CharacterGoal($character);
+        $goal->setLifeGoalCode('fighter.become_strongest');
+        $goal->setCurrentGoalCode('goal.idle');
+        $goal->setCurrentGoalComplete(false);
+
+        $catalog = new GoalCatalog(
+            lifeGoals: [
+                'fighter.become_strongest' => [
+                    'current_goal_pool' => [
+                        ['code' => 'goal.idle', 'weight' => 1],
+                        ['code' => 'goal.participate_tournament', 'weight' => 1],
+                    ],
+                ],
+            ],
+            currentGoals: [
+                'goal.idle'                   => ['interruptible' => true, 'defaults' => []],
+                'goal.participate_tournament' => ['interruptible' => true, 'defaults' => []],
+            ],
+            npcLifeGoals: [],
+            eventRules: [
+                'tournament_announced' => [
+                    'from' => [
+                        'fighter.become_strongest' => [
+                            'set_current_goal' => ['code' => 'goal.participate_tournament'],
+                        ],
+                    ],
+                ],
+            ],
+        );
+
+        $event = $this->withId(1, new CharacterEvent($world, null, 'tournament_announced', 5, ['center_x' => 1, 'center_y' => 0, 'radius' => 5]));
+
+        $resolver = new CharacterGoalResolver();
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 5, events: [$event]);
+
+        self::assertSame(0, $goal->getLastProcessedEventId(), 'Same-day events should not be consumed.');
+        self::assertSame('goal.idle', $goal->getCurrentGoalCode(), 'Same-day events should not affect current goals.');
+    }
+
     public function testConsumesEventsAndAllowsAtMostOneLifeGoalChangePerDay(): void
     {
         $world     = new World('seed-1');
@@ -61,13 +105,13 @@ final class CharacterGoalResolverTest extends TestCase
         $e2 = $this->withId(11, new CharacterEvent($world, $character, 'other_major_event', 0));
 
         $resolver = new CharacterGoalResolver();
-        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 0, events: [$e2, $e1]);
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: [$e2, $e1]);
 
         self::assertSame(11, $goal->getLastProcessedEventId());
         self::assertSame('fighter.become_strongest', $goal->getLifeGoalCode());
         self::assertSame('goal.train_in_dojo', $goal->getCurrentGoalCode());
         self::assertFalse($goal->isCurrentGoalComplete());
-        self::assertSame(0, $goal->getLastResolvedDay());
+        self::assertSame(1, $goal->getLastResolvedDay());
     }
 
     public function testDoesNotOverrideNonInterruptibleCurrentGoal(): void
@@ -111,10 +155,55 @@ final class CharacterGoalResolverTest extends TestCase
         $event = $this->withId(1, new CharacterEvent($world, null, 'tournament_announced', 0, ['center_x' => 1, 'center_y' => 0, 'radius' => 5]));
 
         $resolver = new CharacterGoalResolver();
-        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 0, events: [$event]);
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: [$event]);
 
         self::assertSame(1, $goal->getLastProcessedEventId());
         self::assertSame('goal.train_in_dojo', $goal->getCurrentGoalCode());
+    }
+
+    public function testDoesNotOverrideCurrentGoalWhenSetCurrentGoalChanceIsZero(): void
+    {
+        $world     = new World('seed-1');
+        $character = new Character($world, 'NPC-0001', Race::Human);
+        $character->setTilePosition(0, 0);
+
+        $goal = new CharacterGoal($character);
+        $goal->setLifeGoalCode('fighter.become_strongest');
+        $goal->setCurrentGoalCode('goal.idle');
+        $goal->setCurrentGoalComplete(false);
+
+        $catalog = new GoalCatalog(
+            lifeGoals: [
+                'fighter.become_strongest' => [
+                    'current_goal_pool' => [
+                        ['code' => 'goal.idle', 'weight' => 1],
+                        ['code' => 'goal.participate_tournament', 'weight' => 1],
+                    ],
+                ],
+            ],
+            currentGoals: [
+                'goal.idle'                   => ['interruptible' => true, 'defaults' => []],
+                'goal.participate_tournament' => ['interruptible' => true, 'defaults' => []],
+            ],
+            npcLifeGoals: [],
+            eventRules: [
+                'tournament_announced' => [
+                    'from' => [
+                        'fighter.become_strongest' => [
+                            'set_current_goal' => ['code' => 'goal.participate_tournament', 'chance' => 0.0],
+                        ],
+                    ],
+                ],
+            ],
+        );
+
+        $event = $this->withId(4, new CharacterEvent($world, null, 'tournament_announced', 0, ['center_x' => 1, 'center_y' => 0, 'radius' => 5]));
+
+        $resolver = new CharacterGoalResolver();
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: [$event]);
+
+        self::assertSame(4, $goal->getLastProcessedEventId());
+        self::assertSame('goal.idle', $goal->getCurrentGoalCode());
     }
 
     public function testWorldEventMayOverrideWhenCurrentGoalIsComplete(): void
@@ -158,7 +247,7 @@ final class CharacterGoalResolverTest extends TestCase
         $event = $this->withId(2, new CharacterEvent($world, null, 'tournament_announced', 0, ['center_x' => 1, 'center_y' => 0, 'radius' => 5]));
 
         $resolver = new CharacterGoalResolver();
-        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 0, events: [$event]);
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: [$event]);
 
         self::assertSame(2, $goal->getLastProcessedEventId());
         self::assertSame('goal.participate_tournament', $goal->getCurrentGoalCode());
@@ -207,7 +296,7 @@ final class CharacterGoalResolverTest extends TestCase
         $event = $this->withId(3, new CharacterEvent($world, null, 'tournament_announced', 0, ['center_x' => 5, 'center_y' => 5, 'radius' => 2]));
 
         $resolver = new CharacterGoalResolver();
-        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 0, events: [$event]);
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: [$event]);
 
         self::assertSame(3, $goal->getLastProcessedEventId());
         self::assertSame('goal.idle', $goal->getCurrentGoalCode());
@@ -222,4 +311,3 @@ final class CharacterGoalResolverTest extends TestCase
         return $event;
     }
 }
-

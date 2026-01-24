@@ -15,5 +15,12 @@ final class GoalCatalogLoaderTest extends TestCase
         self::assertNotEmpty($catalog->lifeGoals());
         self::assertNotEmpty($catalog->currentGoals());
     }
-}
 
+    public function testRejectsNonNumericSetCurrentGoalChance(): void
+    {
+        $loader = new GoalCatalogLoader();
+
+        $this->expectException(\InvalidArgumentException::class);
+        $loader->loadFromFile(__DIR__ . '/fixtures/goals_invalid_set_current_goal_chance.yaml');
+    }
+}

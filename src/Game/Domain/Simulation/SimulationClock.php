@@ -40,6 +40,8 @@ final class SimulationClock
      * @param list<TileCoord>       $dojoTiles
      * @param array<int,CharacterGoal> $goalsByCharacterId
      * @param list<CharacterEvent>     $events
+     *
+     * @return list<CharacterEvent>
      */
     public function advanceDays(
         World             $world,
@@ -51,11 +53,13 @@ final class SimulationClock
         array        $goalsByCharacterId = [],
         array        $events = [],
         ?GoalCatalog $goalCatalog = null,
-    ): void
+    ): array
     {
         if ($days < 0) {
             throw new \InvalidArgumentException('Days must be >= 0.');
         }
+
+        $emitted                     = [];
 
         $planner = $this->dailyPlanner ?? new DailyPlanner();
         $stepper = $this->stepTowardTarget ?? new StepTowardTarget();
@@ -100,6 +104,7 @@ final class SimulationClock
                             $goal->setCurrentGoalData($result->data);
                             $goal->setCurrentGoalComplete($result->completed);
                             $plan = $result->plan;
+                            $emitted = array_merge($emitted, $result->events);
                         }
                     }
                 }
@@ -141,6 +146,8 @@ final class SimulationClock
                 $this->advanceTransformationDay($character, $transformations);
             }
         }
+
+        return $emitted;
     }
 
     /**
@@ -153,6 +160,8 @@ final class SimulationClock
      * @param list<TileCoord>       $dojoTiles
      * @param array<int,CharacterGoal> $goalsByCharacterId
      * @param list<CharacterEvent>     $events
+     *
+     * @return list<CharacterEvent>
      */
     public function advanceDaysForLongAction(
         World             $world,
@@ -166,7 +175,7 @@ final class SimulationClock
         array        $goalsByCharacterId = [],
         array        $events = [],
         ?GoalCatalog $goalCatalog = null,
-    ): void
+    ): array
     {
         if ($days < 0) {
             throw new \InvalidArgumentException('Days must be >= 0.');
@@ -177,6 +186,8 @@ final class SimulationClock
         if ($trainingMultiplier !== null && $trainingMultiplier <= 0) {
             throw new \InvalidArgumentException('trainingMultiplier must be > 0 when provided.');
         }
+
+        $emitted                     = [];
 
         $planner = $this->dailyPlanner ?? new DailyPlanner();
         $stepper = $this->stepTowardTarget ?? new StepTowardTarget();
@@ -231,6 +242,7 @@ final class SimulationClock
                             $goal->setCurrentGoalData($result->data);
                             $goal->setCurrentGoalComplete($result->completed);
                             $plan = $result->plan;
+                            $emitted = array_merge($emitted, $result->events);
                         }
                     }
                 }
@@ -272,6 +284,8 @@ final class SimulationClock
                 $this->advanceTransformationDay($character, $transformations);
             }
         }
+
+        return $emitted;
     }
 
     private function advanceTransformationDay(Character $character, TransformationService $service): void

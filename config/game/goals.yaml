@@ -8,6 +8,11 @@ life_goals:
         current_goal_pool:
             -   code: goal.earn_money
                 weight: 1
+    civilian.organize_events:
+        label: Organize events
+        current_goal_pool:
+            -   code: goal.organize_tournament
+                weight: 1
     fighter.become_strongest:
         label: Become the strongest
         current_goal_pool:
@@ -38,6 +43,12 @@ current_goals:
         label: Participate in a tournament
         interruptible: true
         handler: App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler
+    goal.organize_tournament:
+        label: Organize a tournament
+        interruptible: true
+        defaults:
+            radius: 5
+        handler: App\Game\Domain\Goal\Handlers\OrganizeTournamentGoalHandler
     goal.wander:
         label: Wander
         interruptible: true
@@ -53,3 +64,11 @@ npc_life_goals:
     wanderer:
         -   code: wanderer.see_the_world
             weight: 1
+
+event_rules:
+    tournament_announced:
+        from:
+            fighter.become_strongest:
+                chance: 0.0
+                set_current_goal:
+                    code: goal.participate_tournament

@@ -51,7 +51,7 @@ final readonly class CharacterGoalResolver
             if ($eventId <= $lastProcessed) {
                 continue;
             }
-            if ($event->getDay() > $worldDay) {
+            if ($event->getDay() >= $worldDay) {
                 continue;
             }
 
@@ -221,6 +221,22 @@ final readonly class CharacterGoalResolver
 
         $set = $rule['set_current_goal'] ?? null;
         if (is_array($set) && $canInterrupt) {
+            $chanceVal = $set['chance'] ?? null;
+            if (is_float($chanceVal) || is_int($chanceVal)) {
+                $chance = (float)$chanceVal;
+                if ($chance <= 0.0) {
+                    return;
+                }
+                if ($chance > 1.0) {
+                    $chance = 1.0;
+                }
+
+                $roll = random_int(0, 1_000_000) / 1_000_000;
+                if ($roll > $chance) {
+                    return;
+                }
+            }
+
             $code = $set['code'] ?? null;
             if (!is_string($code) || trim($code) === '') {
                 return;
