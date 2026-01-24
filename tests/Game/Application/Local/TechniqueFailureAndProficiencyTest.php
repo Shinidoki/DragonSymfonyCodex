@@ -50,6 +50,8 @@ final class TechniqueFailureAndProficiencyTest extends KernelTestCase
             name: 'Failable Blast',
             type: TechniqueType::Blast,
             config: [
+                'aimModes' => ['actor'],
+                'delivery' => 'point',
                 'range' => 2,
                 'kiCost' => 10,
                 'successChance' => ['at0' => 0.0, 'at100' => 1.0],
@@ -128,6 +130,8 @@ final class TechniqueFailureAndProficiencyTest extends KernelTestCase
             name: 'Sure Blast',
             type: TechniqueType::Blast,
             config: [
+                'aimModes' => ['actor'],
+                'delivery' => 'point',
                 'range' => 2,
                 'kiCost' => 10,
                 'successChance' => ['at0' => 0.0, 'at100' => 1.0],
@@ -185,4 +189,3 @@ final class TechniqueFailureAndProficiencyTest extends KernelTestCase
         self::assertSame(100, $reloadedKnowledge->getProficiency());
     }
 }
-

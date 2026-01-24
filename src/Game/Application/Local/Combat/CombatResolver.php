@@ -10,16 +10,16 @@ use App\Entity\LocalCombatant;
 use App\Entity\LocalSession;
 use App\Entity\TechniqueDefinition;
 use App\Game\Application\Local\LocalEventLog;
+use App\Game\Domain\LocalMap\AimMode;
+use App\Game\Domain\LocalMap\Direction;
+use App\Game\Domain\LocalMap\LocalAction;
+use App\Game\Domain\LocalMap\LocalActionType;
 use App\Game\Domain\LocalMap\VisibilityRadius;
-use App\Game\Domain\Techniques\Execution\BeamExecutor;
-use App\Game\Domain\Techniques\Execution\BlastExecutor;
-use App\Game\Domain\Techniques\Execution\ChargedExecutor;
-use App\Game\Domain\Techniques\Execution\TechniqueContext;
-use App\Game\Domain\Techniques\Execution\TechniqueExecution;
-use App\Game\Domain\Techniques\Execution\TechniqueExecutor;
-use App\Game\Domain\Techniques\TechniqueType;
-use App\Repository\TechniqueDefinitionRepository;
+use App\Game\Domain\Techniques\Execution\TechniqueDamageCalculator;
+use App\Game\Domain\Techniques\Execution\TechniqueUseCalculator;
+use App\Game\Domain\Techniques\Targeting\LocalTargetSelector;
 use App\Game\Domain\Transformations\TransformationService;
+use App\Repository\TechniqueDefinitionRepository;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class CombatResolver
@@ -28,132 +28,36 @@ final class CombatResolver
     {
     }
 
+    public function useTechniqueFromAction(LocalSession $session, LocalActor $attacker, LocalAction $action): void
+    {
+        if ($action->type !== LocalActionType::Technique || $action->techniqueCode === null) {
+            throw new \InvalidArgumentException('Action must be a technique action.');
+        }
+
+        $this->useTechniqueWithAim(
+            session: $session,
+            attacker: $attacker,
+            techniqueCode: $action->techniqueCode,
+            aimMode: $action->aimMode,
+            targetActorId: $action->targetActorId,
+            direction: $action->direction,
+            targetX: $action->targetX,
+            targetY: $action->targetY,
+        );
+    }
+
     public function useTechnique(LocalSession $session, LocalActor $attacker, int $targetActorId, string $techniqueCode): void
     {
-        $target = $this->entityManager->find(LocalActor::class, $targetActorId);
-        if (!$target instanceof LocalActor || (int)$target->getSession()->getId() !== (int)$session->getId()) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No valid target.');
-            return;
-        }
-
-        $techniqueCode = strtolower(trim($techniqueCode));
-        if ($techniqueCode === '') {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No technique selected.');
-            return;
-        }
-
-        /** @var TechniqueDefinitionRepository $techniqueRepo */
-        $techniqueRepo = $this->entityManager->getRepository(TechniqueDefinition::class);
-
-        $definition = $techniqueRepo->findEnabledByCode($techniqueCode);
-        if (!$definition instanceof TechniqueDefinition) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Unknown technique.');
-            return;
-        }
-
-        $attackerCharacter = $this->entityManager->find(Character::class, $attacker->getCharacterId());
-        if (!$attackerCharacter instanceof Character) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No character for attacker.');
-            return;
-        }
-
-        $knowledge = $this->entityManager->getRepository(CharacterTechnique::class)->findOneBy([
-            'character' => $attackerCharacter,
-            'technique' => $definition,
-        ]);
-        if (!$knowledge instanceof CharacterTechnique) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'You do not know that technique.');
-            return;
-        }
-
-        $config = $definition->getConfig();
-        $range  = (int)($config['range'] ?? 1);
-        $distance = abs($attacker->getX() - $target->getX()) + abs($attacker->getY() - $target->getY());
-        if ($distance > $range) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Target is too far away.');
-            return;
-        }
-
-        if ($attacker->isCharging()) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Already charging.');
-            return;
-        }
-
-        $combat            = $this->getOrCreateCombat($session);
-        $attackerCombatant = $this->getOrCreateCombatant($combat, $attacker);
-        $defenderCombatant = $this->getOrCreateCombatant($combat, $target);
-
-        $defenderCharacter = $this->entityManager->find(Character::class, $target->getCharacterId());
-        if (!$defenderCharacter instanceof Character) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No character for target.');
-            return;
-        }
-
-        $context = new TechniqueContext(
-            sessionId: (int)$session->getId(),
-            tick: $session->getCurrentTick(),
-            definition: $definition,
-            knowledge: $knowledge,
-            attackerActor: $attacker,
-            defenderActor: $target,
-            attackerCharacter: $attackerCharacter,
-            defenderCharacter: $defenderCharacter,
+        $this->useTechniqueWithAim(
+            session: $session,
+            attacker: $attacker,
+            techniqueCode: $techniqueCode,
+            aimMode: AimMode::Actor,
+            targetActorId: $targetActorId,
+            direction: null,
+            targetX: null,
+            targetY: null,
         );
-
-        $executor = $this->executorFor($definition->getType());
-        $execution = $executor->execute($context);
-
-        $spent = $execution->kiSpent;
-        if ($spent > 0 && !$attackerCombatant->spendKi($spent)) {
-            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Not enough Ki.');
-            $this->entityManager->persist($combat);
-            $this->entityManager->persist($attackerCombatant);
-            $this->entityManager->persist($defenderCombatant);
-            return;
-        }
-
-        if ($execution->startedChargingCode !== null && $execution->startedChargingTicksRemaining !== null && $execution->startedChargingTargetActorId !== null) {
-            $attacker->startCharging(
-                $execution->startedChargingCode,
-                $execution->startedChargingTicksRemaining,
-                $execution->startedChargingTargetActorId,
-            );
-        }
-
-        if ($execution->clearedCharging) {
-            $attacker->clearCharging();
-        }
-
-        if ($execution->damage > 0) {
-            $defenderCombatant->applyDamage($execution->damage, $session->getCurrentTick());
-        }
-
-        $this->recordEvent($session, $attacker->getX(), $attacker->getY(), $execution->message);
-
-        if ($defenderCombatant->isDefeated()) {
-            $this->recordEvent(
-                $session,
-                $attacker->getX(),
-                $attacker->getY(),
-                sprintf('%s defeats %s.', $attackerCharacter->getName(), $defenderCharacter->getName()),
-            );
-
-            $combat->resolve();
-        }
-
-        if ($execution->success) {
-            $knowledge->incrementProficiency(1);
-            $this->entityManager->persist($knowledge);
-        }
-
-        if ($defenderCombatant->isDefeated()) {
-            // already handled above
-        }
-
-        $this->entityManager->persist($combat);
-        $this->entityManager->persist($attackerCombatant);
-        $this->entityManager->persist($defenderCombatant);
-        $this->entityManager->persist($attacker);
     }
 
     public function attack(LocalSession $session, LocalActor $attacker, int $targetActorId): void
@@ -305,22 +209,189 @@ final class CombatResolver
         return max(1, $attackerKiControl - intdiv($defenderDurability, 2));
     }
 
-    private function executorFor(TechniqueType $type): TechniqueExecutor
+    private function useTechniqueWithAim(
+        LocalSession $session,
+        LocalActor   $attacker,
+        string       $techniqueCode,
+        AimMode      $aimMode,
+        ?int         $targetActorId,
+        ?Direction   $direction,
+        ?int         $targetX,
+        ?int         $targetY,
+    ): void
     {
-        // Simple selection for now (no container wiring).
-        $executors = [
-            new BlastExecutor(),
-            new BeamExecutor(),
-            new ChargedExecutor(),
-        ];
-
-        foreach ($executors as $executor) {
-            if ($executor->supports($type)) {
-                return $executor;
-            }
+        $techniqueCode = strtolower(trim($techniqueCode));
+        if ($techniqueCode === '') {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No technique selected.');
+            return;
         }
 
-        throw new \LogicException(sprintf('No executor for technique type: %s', $type->value));
+        /** @var TechniqueDefinitionRepository $techniqueRepo */
+        $techniqueRepo = $this->entityManager->getRepository(TechniqueDefinition::class);
+
+        $definition = $techniqueRepo->findEnabledByCode($techniqueCode);
+        if (!$definition instanceof TechniqueDefinition) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Unknown technique.');
+            return;
+        }
+
+        $config = $definition->getConfig();
+        if (!isset($config['aimModes'], $config['delivery'])) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Technique is misconfigured.');
+            return;
+        }
+
+        $allowedAimModes = array_map('strtolower', is_array($config['aimModes']) ? $config['aimModes'] : []);
+        if (!in_array($aimMode->value, $allowedAimModes, true)) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'That technique cannot be aimed that way.');
+            return;
+        }
+
+        $attackerCharacter = $this->entityManager->find(Character::class, $attacker->getCharacterId());
+        if (!$attackerCharacter instanceof Character) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No character for attacker.');
+            return;
+        }
+
+        $knowledge = $this->entityManager->getRepository(CharacterTechnique::class)->findOneBy([
+            'character' => $attackerCharacter,
+            'technique' => $definition,
+        ]);
+        if (!$knowledge instanceof CharacterTechnique) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'You do not know that technique.');
+            return;
+        }
+
+        if ($attacker->hasPreparedTechnique()) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Already charging.');
+            return;
+        }
+
+        $range     = (int)($config['range'] ?? 0);
+        $delivery  = (string)$config['delivery'];
+        $piercing  = isset($config['piercing']) ? (string)$config['piercing'] : null;
+        $aoeRadius = isset($config['aoeRadius']) ? (int)$config['aoeRadius'] : null;
+
+        $aimX = $targetX;
+        $aimY = $targetY;
+
+        if ($aimMode === AimMode::Actor) {
+            if ($targetActorId === null) {
+                $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No valid target.');
+                return;
+            }
+
+            $actorTarget = $this->entityManager->find(LocalActor::class, $targetActorId);
+            if (!$actorTarget instanceof LocalActor || (int)$actorTarget->getSession()->getId() !== (int)$session->getId()) {
+                $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'No valid target.');
+                return;
+            }
+
+            $aimX = $actorTarget->getX();
+            $aimY = $actorTarget->getY();
+        }
+
+        /** @var list<LocalActor> $actors */
+        $actors = $this->entityManager->getRepository(LocalActor::class)->findBy(['session' => $session], ['id' => 'ASC']);
+
+        $targets = (new LocalTargetSelector())->selectTargets(
+            attacker: $attacker,
+            actors: $actors,
+            aimMode: $aimMode,
+            direction: $direction,
+            targetX: $aimX,
+            targetY: $aimY,
+            range: $range,
+            delivery: $delivery,
+            piercing: $piercing,
+            aoeRadius: $aoeRadius,
+        );
+
+        $combat            = $this->getOrCreateCombat($session);
+        $attackerCombatant = $this->getOrCreateCombatant($combat, $attacker);
+
+        $useCalc    = new TechniqueUseCalculator();
+        $damageCalc = new TechniqueDamageCalculator();
+
+        $effectiveCost = $useCalc->effectiveKiCost($definition, $knowledge);
+        $success       = $useCalc->rollSuccess($definition, $knowledge, (int)$session->getId(), $session->getCurrentTick(), (int)$attacker->getId());
+        $spent         = $success ? $effectiveCost : (int)ceil($effectiveCost * $useCalc->failureKiCostMultiplier($definition));
+
+        if ($spent > 0 && !$attackerCombatant->spendKi($spent)) {
+            $this->recordEvent($session, $attacker->getX(), $attacker->getY(), 'Not enough Ki.');
+            $this->entityManager->persist($combat);
+            $this->entityManager->persist($attackerCombatant);
+            return;
+        }
+
+        if (!$success) {
+            $this->recordEvent(
+                $session,
+                $attacker->getX(),
+                $attacker->getY(),
+                sprintf('%s fails to use %s.', $attackerCharacter->getName(), $definition->getName()),
+            );
+
+            $this->entityManager->persist($combat);
+            $this->entityManager->persist($attackerCombatant);
+            return;
+        }
+
+        if ($targets === []) {
+            $this->recordEvent(
+                $session,
+                $attacker->getX(),
+                $attacker->getY(),
+                sprintf('%s uses %s, but it hits nothing.', $attackerCharacter->getName(), $definition->getName()),
+            );
+
+            $knowledge->incrementProficiency(1);
+            $this->entityManager->persist($knowledge);
+            $this->entityManager->persist($combat);
+            $this->entityManager->persist($attackerCombatant);
+            return;
+        }
+
+        $anyDefeated = false;
+
+        foreach ($targets as $target) {
+            $defenderCharacter = $this->entityManager->find(Character::class, $target->getCharacterId());
+            if (!$defenderCharacter instanceof Character) {
+                continue;
+            }
+
+            $defenderCombatant = $this->getOrCreateCombatant($combat, $target);
+            $damage            = $damageCalc->damageFor($definition, $knowledge, $attackerCharacter, $defenderCharacter);
+            $defenderCombatant->applyDamage($damage, $session->getCurrentTick());
+
+            $this->recordEvent(
+                $session,
+                $attacker->getX(),
+                $attacker->getY(),
+                sprintf('%s uses %s on %s for %d damage.', $attackerCharacter->getName(), $definition->getName(), $defenderCharacter->getName(), $damage),
+            );
+
+            if ($defenderCombatant->isDefeated()) {
+                $anyDefeated = true;
+                $this->recordEvent(
+                    $session,
+                    $attacker->getX(),
+                    $attacker->getY(),
+                    sprintf('%s defeats %s.', $attackerCharacter->getName(), $defenderCharacter->getName()),
+                );
+            }
+
+            $this->entityManager->persist($defenderCombatant);
+        }
+
+        if ($anyDefeated) {
+            $combat->resolve();
+        }
+
+        $knowledge->incrementProficiency(1);
+        $this->entityManager->persist($knowledge);
+        $this->entityManager->persist($combat);
+        $this->entityManager->persist($attackerCombatant);
     }
 
     private function characterName(int $characterId): string

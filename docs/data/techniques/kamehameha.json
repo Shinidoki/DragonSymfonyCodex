@@ -5,9 +5,18 @@
   "enabled": true,
   "version": 1,
   "config": {
+      "aimModes": [
+          "actor",
+          "dir",
+          "point"
+      ],
+      "delivery": "ray",
+      "piercing": "all",
     "range": 4,
     "kiCost": 12,
     "chargeTicks": 2,
+      "holdKiPerTick": 1,
+      "allowMoveWhilePrepared": false,
     "damage": {
       "stat": "kiControl",
       "statMultiplier": 2.0,
@@ -24,4 +33,3 @@
     }
   }
 }
-

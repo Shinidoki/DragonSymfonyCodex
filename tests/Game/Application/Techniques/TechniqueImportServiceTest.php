@@ -32,7 +32,12 @@ final class TechniqueImportServiceTest extends KernelTestCase
             'type'    => 'blast',
             'enabled' => true,
             'version' => 1,
-            'config'  => ['kiCost' => 3, 'range' => 2],
+            'config' => [
+                'aimModes' => ['actor', 'dir', 'point'],
+                'delivery' => 'projectile',
+                'kiCost'   => 3,
+                'range'    => 2,
+            ],
         ], JSON_THROW_ON_ERROR));
 
         self::assertSame(1, $result->created);
@@ -44,7 +49,12 @@ final class TechniqueImportServiceTest extends KernelTestCase
             'type'    => 'blast',
             'enabled' => true,
             'version' => 2,
-            'config'  => ['kiCost' => 4, 'range' => 2],
+            'config' => [
+                'aimModes' => ['actor', 'dir', 'point'],
+                'delivery' => 'projectile',
+                'kiCost'   => 4,
+                'range'    => 2,
+            ],
         ], JSON_THROW_ON_ERROR));
 
         self::assertSame(0, $result->created);
@@ -57,4 +67,3 @@ final class TechniqueImportServiceTest extends KernelTestCase
         self::assertSame(2, $reloaded->getVersion());
     }
 }
-

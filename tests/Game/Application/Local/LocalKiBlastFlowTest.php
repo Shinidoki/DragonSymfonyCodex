@@ -56,7 +56,12 @@ final class LocalKiBlastFlowTest extends KernelTestCase
             code: 'ki_blast',
             name: 'Ki Blast',
             type: TechniqueType::Blast,
-            config: ['range' => 2, 'kiCost' => 3],
+            config: [
+                'aimModes' => ['actor', 'dir', 'point'],
+                'delivery' => 'projectile',
+                'range'    => 2,
+                'kiCost'   => 3,
+            ],
             enabled: true,
             version: 1,
         );

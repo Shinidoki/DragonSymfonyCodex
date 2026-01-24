@@ -136,4 +136,116 @@ final class LocalActionParsingTest extends KernelTestCase
 
         self::assertSame(Command::SUCCESS, $exitCode);
     }
+
+    public function testTechniqueIsAcceptedWithDirectionAim(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'ki_blast',
+            '--dir'       => 'north',
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testTechniqueIsAcceptedWithPointAim(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'ki_blast',
+            '--x'         => 1,
+            '--y'         => 2,
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testTechniqueIsAcceptedWithTargetAim(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'ki_blast',
+            '--target'    => $session['targetActorId'],
+        ]);
+
+        self::assertSame(Command::SUCCESS, $exitCode);
+    }
+
+    public function testTechniqueRejectsMultipleAimOptions(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'ki_blast',
+            '--dir'       => 'north',
+            '--target'    => $session['targetActorId'],
+        ]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
+
+    public function testTechniqueRejectsIncompletePointAim(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $session = $this->createSessionWithNpcTarget($entityManager);
+
+        $application = new Application(self::$kernel);
+        $tester      = new CommandTester($application->find('game:local:action'));
+
+        $exitCode = $tester->execute([
+            '--session'   => $session['sessionId'],
+            '--type'      => 'technique',
+            '--technique' => 'ki_blast',
+            '--x'         => 1,
+        ]);
+
+        self::assertSame(Command::INVALID, $exitCode);
+    }
 }

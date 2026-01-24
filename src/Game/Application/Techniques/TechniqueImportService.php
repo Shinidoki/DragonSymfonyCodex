@@ -63,11 +63,13 @@ final class TechniqueImportService
                 throw new \InvalidArgumentException('Technique config must be an object.');
             }
 
+            /** @var array<string,mixed> $config */
+            $this->validateConfig($type, $config);
+
             $existing = $this->entityManager->getRepository(TechniqueDefinition::class)->findOneBy(['code' => $code]);
             if ($existing instanceof TechniqueDefinition) {
                 $existing->setName($name);
                 $existing->setType($type);
-                /** @var array<string,mixed> $config */
                 $existing->setConfig($config);
                 $existing->setEnabled($enabled);
                 $existing->setVersion($version);
@@ -93,5 +95,63 @@ final class TechniqueImportService
 
         return new TechniqueImportResult($created, $updated, $skipped);
     }
-}
 
+    /**
+     * @param array<string,mixed> $config
+     */
+    private function validateConfig(TechniqueType $type, array $config): void
+    {
+        $aimModes = $config['aimModes'] ?? null;
+        if (!is_array($aimModes) || $aimModes === []) {
+            throw new \InvalidArgumentException('Technique config.aimModes must be a non-empty list.');
+        }
+
+        $allowedAimModes = ['self', 'actor', 'dir', 'point'];
+        foreach ($aimModes as $mode) {
+            if (!is_string($mode) || !in_array($mode, $allowedAimModes, true)) {
+                throw new \InvalidArgumentException(sprintf('Invalid aimMode: %s', is_scalar($mode) ? (string)$mode : gettype($mode)));
+            }
+        }
+
+        $delivery        = $config['delivery'] ?? null;
+        $allowedDelivery = ['point', 'projectile', 'ray', 'aoe'];
+        if (!is_string($delivery) || !in_array($delivery, $allowedDelivery, true)) {
+            throw new \InvalidArgumentException('Technique config.delivery must be one of: point, projectile, ray, aoe.');
+        }
+
+        if (!isset($config['range']) || !is_int($config['range']) || $config['range'] < 0) {
+            throw new \InvalidArgumentException('Technique config.range must be an int >= 0.');
+        }
+
+        if (!isset($config['kiCost']) || !is_int($config['kiCost']) || $config['kiCost'] < 0) {
+            throw new \InvalidArgumentException('Technique config.kiCost must be an int >= 0.');
+        }
+
+        if ($delivery === 'aoe') {
+            if (!isset($config['aoeRadius']) || !is_int($config['aoeRadius']) || $config['aoeRadius'] < 0) {
+                throw new \InvalidArgumentException('Technique config.aoeRadius must be an int >= 0 when delivery=aoe.');
+            }
+        }
+
+        if ($delivery === 'ray') {
+            $piercing = $config['piercing'] ?? null;
+            if (!is_string($piercing) || !in_array($piercing, ['first', 'all'], true)) {
+                throw new \InvalidArgumentException('Technique config.piercing must be one of: first, all when delivery=ray.');
+            }
+        }
+
+        if ($type === TechniqueType::Charged) {
+            if (!isset($config['chargeTicks']) || !is_int($config['chargeTicks']) || $config['chargeTicks'] < 0) {
+                throw new \InvalidArgumentException('Technique config.chargeTicks must be an int >= 0 when type=charged.');
+            }
+
+            if (isset($config['holdKiPerTick']) && (!is_int($config['holdKiPerTick']) || $config['holdKiPerTick'] < 0)) {
+                throw new \InvalidArgumentException('Technique config.holdKiPerTick must be an int >= 0 when provided.');
+            }
+
+            if (isset($config['allowMoveWhilePrepared']) && !is_bool($config['allowMoveWhilePrepared'])) {
+                throw new \InvalidArgumentException('Technique config.allowMoveWhilePrepared must be boolean when provided.');
+            }
+        }
+    }
+}

@@ -2,6 +2,7 @@
 
 namespace App\Entity;
 
+use App\Game\Domain\Techniques\Prepared\PreparedTechniquePhase;
 use App\Repository\LocalActorRepository;
 use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
@@ -39,13 +40,13 @@ class LocalActor
     private \DateTimeImmutable $createdAt;
 
     #[ORM\Column(length: 64, nullable: true)]
-    private ?string $chargingTechniqueCode = null;
+    private ?string $preparedTechniqueCode = null;
+
+    #[ORM\Column(enumType: PreparedTechniquePhase::class, nullable: true)]
+    private ?PreparedTechniquePhase $preparedPhase = null;
 
     #[ORM\Column(options: ['default' => 0])]
-    private int $chargingTicksRemaining = 0;
-
-    #[ORM\Column(nullable: true)]
-    private ?int $chargingTargetActorId = null;
+    private int $preparedTicksRemaining = 0;
 
     public function __construct(LocalSession $session, int $characterId, string $role, int $x, int $y)
     {
@@ -126,27 +127,27 @@ class LocalActor
         return $this->createdAt;
     }
 
-    public function isCharging(): bool
+    public function hasPreparedTechnique(): bool
     {
-        return $this->chargingTechniqueCode !== null && $this->chargingTicksRemaining > 0;
+        return $this->preparedTechniqueCode !== null;
     }
 
-    public function getChargingTechniqueCode(): ?string
+    public function getPreparedTechniqueCode(): ?string
     {
-        return $this->chargingTechniqueCode;
+        return $this->preparedTechniqueCode;
     }
 
-    public function getChargingTicksRemaining(): int
+    public function getPreparedPhase(): ?PreparedTechniquePhase
     {
-        return $this->chargingTicksRemaining;
+        return $this->preparedPhase;
     }
 
-    public function getChargingTargetActorId(): ?int
+    public function getPreparedTicksRemaining(): int
     {
-        return $this->chargingTargetActorId;
+        return $this->preparedTicksRemaining;
     }
 
-    public function startCharging(string $techniqueCode, int $ticksRemaining, int $targetActorId): void
+    public function startPreparingTechnique(string $techniqueCode, PreparedTechniquePhase $phase, int $ticksRemaining): void
     {
         $techniqueCode = strtolower(trim($techniqueCode));
         if ($techniqueCode === '') {
@@ -155,28 +156,35 @@ class LocalActor
         if ($ticksRemaining < 0) {
             throw new \InvalidArgumentException('ticksRemaining must be >= 0.');
         }
-        if ($targetActorId <= 0) {
-            throw new \InvalidArgumentException('targetActorId must be positive.');
-        }
 
-        $this->chargingTechniqueCode  = $techniqueCode;
-        $this->chargingTicksRemaining = $ticksRemaining;
-        $this->chargingTargetActorId  = $targetActorId;
+        $this->preparedTechniqueCode  = $techniqueCode;
+        $this->preparedPhase          = $phase;
+        $this->preparedTicksRemaining = $ticksRemaining;
     }
 
-    public function decrementChargingTick(): void
+    public function decrementPreparedTick(): void
     {
-        if ($this->chargingTicksRemaining <= 0) {
+        if ($this->preparedTicksRemaining <= 0) {
             return;
         }
 
-        $this->chargingTicksRemaining--;
+        $this->preparedTicksRemaining--;
     }
 
-    public function clearCharging(): void
+    public function markPreparedReady(): void
     {
-        $this->chargingTechniqueCode  = null;
-        $this->chargingTicksRemaining = 0;
-        $this->chargingTargetActorId  = null;
+        if ($this->preparedTechniqueCode === null) {
+            return;
+        }
+
+        $this->preparedPhase          = PreparedTechniquePhase::Ready;
+        $this->preparedTicksRemaining = 0;
+    }
+
+    public function clearPreparedTechnique(): void
+    {
+        $this->preparedTechniqueCode  = null;
+        $this->preparedPhase          = null;
+        $this->preparedTicksRemaining = 0;
     }
 }

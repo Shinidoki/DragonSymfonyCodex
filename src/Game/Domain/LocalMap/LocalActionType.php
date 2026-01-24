@@ -9,4 +9,6 @@ enum LocalActionType: string
     case Talk = 'talk';
     case Attack = 'attack';
     case Technique = 'technique';
+    case Cancel = 'cancel';
+    case Transform = 'transform';
 }
