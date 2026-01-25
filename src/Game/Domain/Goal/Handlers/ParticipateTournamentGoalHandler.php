@@ -17,16 +17,29 @@ final class ParticipateTournamentGoalHandler implements CurrentGoalHandlerInterf
     {
         $x = $data['center_x'] ?? null;
         $y = $data['center_y'] ?? null;
+        $resolveDay = $data['resolve_day'] ?? null;
 
         if (!is_int($x) || !is_int($y) || $x < 0 || $y < 0) {
-            throw new \InvalidArgumentException('center_x and center_y must be integers >= 0.');
-        }
-
-        if ($character->getTileX() === $x && $character->getTileY() === $y) {
             return new GoalStepResult(
                 plan: new DailyPlan(DailyActivity::Rest),
                 data: $data,
                 completed: true,
+            );
+        }
+
+        if ($character->getTileX() === $x && $character->getTileY() === $y) {
+            if (is_int($resolveDay) && $resolveDay >= 0 && $world->getCurrentDay() > $resolveDay) {
+                return new GoalStepResult(
+                    plan: new DailyPlan(DailyActivity::Rest),
+                    data: $data,
+                    completed: true,
+                );
+            }
+
+            return new GoalStepResult(
+                plan: new DailyPlan(DailyActivity::Rest),
+                data: $data,
+                completed: false,
             );
         }
 
@@ -37,4 +50,3 @@ final class ParticipateTournamentGoalHandler implements CurrentGoalHandlerInterf
         );
     }
 }
-

@@ -57,7 +57,7 @@ current_goals:
         handler: App\Game\Domain\Goal\Handlers\TrainInDojoGoalHandler
     goal.participate_tournament:
         label: Participate in a tournament
-        interruptible: true
+        interruptible: false
         work_focus_target: 0
         handler: App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler
     goal.organize_tournament:
@@ -93,7 +93,6 @@ event_rules:
     tournament_announced:
         from:
             fighter.become_strongest:
-                chance: 0.0
                 set_current_goal:
                     code: goal.participate_tournament
     money_low_employed:
