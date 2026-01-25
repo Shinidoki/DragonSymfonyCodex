@@ -3,10 +3,12 @@
 namespace App\Game\Application\Simulation;
 
 use App\Entity\Settlement;
+use App\Entity\Tournament;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
 use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
+use App\Game\Domain\Economy\EconomyCatalog;
 use App\Game\Domain\Map\TileCoord;
 use App\Game\Domain\Simulation\SimulationClock;
 use App\Game\Domain\Stats\Growth\TrainingIntensity;
@@ -125,6 +127,11 @@ final class AdvanceDayHandler
                 }
 
                 $this->entityManager->flush();
+
+                if ($economyCatalog instanceof EconomyCatalog && $settlementEntities !== []) {
+                    $this->persistTournamentsFromAnnounceEvents($world, $settlementEntities, $economyCatalog, $emitted);
+                    $this->entityManager->flush();
+                }
             }
 
             return new AdvanceDayResult($world, $characters, $days);
@@ -190,6 +197,78 @@ final class AdvanceDayHandler
         $n = $this->hashInt(sprintf('%s:settlement:prosperity:%d:%d', $worldSeed, $x, $y));
 
         return 25 + ($n % 51); // 25..75
+    }
+
+    /**
+     * @param list<Settlement>                 $settlements
+     * @param list<\App\Entity\CharacterEvent> $events
+     */
+    private function persistTournamentsFromAnnounceEvents(World $world, array $settlements, EconomyCatalog $economyCatalog, array $events): void
+    {
+        $byCoord = [];
+        foreach ($settlements as $s) {
+            $byCoord[sprintf('%d:%d', $s->getX(), $s->getY())] = $s;
+        }
+
+        foreach ($events as $event) {
+            if ($event->getType() !== 'tournament_announced') {
+                continue;
+            }
+
+            $id = $event->getId();
+            if ($id === null) {
+                continue;
+            }
+
+            $data = $event->getData();
+            if (!is_array($data)) {
+                continue;
+            }
+
+            $x = $data['center_x'] ?? null;
+            $y = $data['center_y'] ?? null;
+            if (!is_int($x) || !is_int($y) || $x < 0 || $y < 0) {
+                continue;
+            }
+
+            $settlement = $byCoord[sprintf('%d:%d', $x, $y)] ?? null;
+            if (!$settlement instanceof Settlement) {
+                continue;
+            }
+
+            $announceDay = $event->getDay();
+            $resolveDay  = $announceDay + max(1, $economyCatalog->tournamentDurationDays());
+
+            $spend     = $data['spend'] ?? 0;
+            $prizePool = $data['prize_pool'] ?? 0;
+            $radius    = $data['radius'] ?? 0;
+
+            if (!is_int($spend) || $spend < 0) {
+                $spend = 0;
+            }
+            if (!is_int($prizePool) || $prizePool < 0) {
+                $prizePool = 0;
+            }
+            if (!is_int($radius) || $radius < 0) {
+                $radius = 0;
+            }
+            if ($prizePool > $spend) {
+                $prizePool = $spend;
+            }
+
+            $tournament = new Tournament(
+                world: $world,
+                settlement: $settlement,
+                announceDay: $announceDay,
+                resolveDay: $resolveDay,
+                spend: $spend,
+                prizePool: $prizePool,
+                radius: $radius,
+                requestEventId: $id,
+            );
+
+            $this->entityManager->persist($tournament);
+        }
     }
 
     private function hashInt(string $input): int

@@ -1,0 +1,64 @@
+# Minimal economy catalog placeholder.
+#
+# Tunes settlement production, taxes, and job wages/radii.
+
+settlement:
+    wage_pool_rate: 0.70
+    tax_rate: 0.20
+    production:
+        per_work_unit_base: 10
+        per_work_unit_prosperity_mult: 1
+        randomness_pct: 0.15
+
+thresholds:
+    money_low_employed: 10
+    money_low_unemployed: 5
+
+jobs:
+    laborer:
+        label: Laborer
+        wage_weight: 1
+        work_radius: 2
+    farmer:
+        label: Farmer
+        wage_weight: 1
+        work_radius: 2
+    artisan:
+        label: Artisan
+        wage_weight: 2
+        work_radius: 1
+    merchant:
+        label: Merchant
+        wage_weight: 3
+        work_radius: 1
+    guard:
+        label: Guard
+        wage_weight: 2
+        work_radius: 3
+
+employment_pools:
+    civilian:
+        - { code: laborer,  weight: 5 }
+        - { code: farmer,   weight: 3 }
+        - { code: artisan,  weight: 2 }
+        - { code: merchant, weight: 1 }
+    fighter:
+        - { code: guard,    weight: 5 }
+        - { code: laborer,  weight: 1 }
+    wanderer: [ ]
+
+tournaments:
+    min_spend: 50
+    max_spend_fraction_of_treasury: 0.30
+    prize_pool_fraction: 0.50
+    duration_days: 2
+    radius:
+        base: 2
+        per_spend: 50
+        max: 20
+    gains:
+        fame_base: 1
+        fame_per_spend: 100
+        prosperity_base: 1
+        prosperity_per_spend: 150
+        per_participant_fame: 1

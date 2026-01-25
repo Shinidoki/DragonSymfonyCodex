@@ -109,7 +109,7 @@ final class SimulationClock
                                 world: $world,
                                 currentGoalCode: $currentGoalCode,
                                 data: $goal->getCurrentGoalData() ?? [],
-                                context: new GoalContext($dojoTiles, $settlementTiles),
+                                context: new GoalContext($dojoTiles, $settlementTiles, $settlementsByCoord, $economyCatalog),
                                 catalog: $goalCatalog,
                             );
 
@@ -309,7 +309,7 @@ final class SimulationClock
                                 world: $world,
                                 currentGoalCode: $currentGoalCode,
                                 data: $goal->getCurrentGoalData() ?? [],
-                                context: new GoalContext($dojoTiles, $settlementTiles),
+                                context: new GoalContext($dojoTiles, $settlementTiles, $settlementsByCoord, $economyCatalog),
                                 catalog: $goalCatalog,
                             );
 

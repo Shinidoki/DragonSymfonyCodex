@@ -2,6 +2,8 @@
 
 namespace App\Game\Domain\Goal;
 
+use App\Entity\Settlement;
+use App\Game\Domain\Economy\EconomyCatalog;
 use App\Game\Domain\Map\TileCoord;
 
 final readonly class GoalContext
@@ -9,8 +11,14 @@ final readonly class GoalContext
     /**
      * @param list<TileCoord> $dojoTiles
      * @param list<TileCoord> $settlementTiles
+     * @param array<string,Settlement> $settlementsByCoord
      */
-    public function __construct(public array $dojoTiles = [], public array $settlementTiles = [])
+    public function __construct(
+        public array           $dojoTiles = [],
+        public array           $settlementTiles = [],
+        public array           $settlementsByCoord = [],
+        public ?EconomyCatalog $economyCatalog = null,
+    )
     {
     }
 }

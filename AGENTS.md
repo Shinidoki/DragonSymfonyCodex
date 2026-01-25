@@ -32,6 +32,7 @@
 - Follow `.editorconfig`: LF line endings, 4-space indentation (2 spaces for `compose*.yaml`), trim trailing whitespace.
 - Keep Symfony conventions: `App\\` namespace, one class per file, clear service names, and Twig templates named
   `*.html.twig`.
+- Always use the console commands to generate classes/migrations where possible and then edit them.
 
 ## Testing Guidelines
 
