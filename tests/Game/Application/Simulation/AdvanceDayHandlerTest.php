@@ -126,7 +126,7 @@ final class AdvanceDayHandlerTest extends TestCase
         $goals = new CharacterGoal($character);
         $goals->setLifeGoalCode('fighter.become_strongest');
         $goals->setCurrentGoalCode('goal.participate_tournament');
-        $goals->setCurrentGoalData(['center_x' => 1, 'center_y' => 0]);
+        $goals->setCurrentGoalData(['center_x' => 1, 'center_y' => 0, 'resolve_day' => 3]);
         $goals->setCurrentGoalComplete(false);
 
         $worldRepository = $this->createMock(WorldRepository::class);

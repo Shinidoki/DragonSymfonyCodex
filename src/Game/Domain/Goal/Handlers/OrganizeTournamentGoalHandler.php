@@ -159,6 +159,8 @@ final class OrganizeTournamentGoalHandler implements CurrentGoalHandlerInterface
             type: 'tournament_announced',
             day: $world->getCurrentDay(),
             data: [
+                'announce_day'           => $world->getCurrentDay(),
+                'registration_close_day' => $world->getCurrentDay() + 1,
                 'center_x'        => $settlement->getX(),
                 'center_y'        => $settlement->getY(),
                 'radius'          => $radius,

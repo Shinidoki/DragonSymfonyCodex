@@ -88,6 +88,8 @@ final class TournamentEventLoopTest extends KernelTestCase
         self::assertInstanceOf(CharacterEvent::class, $event);
         self::assertNull($event->getCharacter());
         self::assertSame([
+            'announce_day'           => 1,
+            'registration_close_day' => 2,
             'center_x'        => 3,
             'center_y'        => 0,
             'radius'          => 6,

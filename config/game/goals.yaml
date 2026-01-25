@@ -23,13 +23,13 @@ life_goals:
         label: Become the strongest
         current_goal_pool:
             -   code: goal.train_in_dojo
-                weight: 1
+                weight: 10
             -   code: goal.participate_tournament
                 weight: 1
             -   code: goal.earn_money
-                weight: 1
+                weight: 3
             -   code: goal.find_job
-                weight: 1
+                weight: 3
     wanderer.see_the_world:
         label: See the world
         current_goal_pool:
@@ -59,6 +59,8 @@ current_goals:
         label: Participate in a tournament
         interruptible: false
         work_focus_target: 0
+        defaults:
+            search_timeout_days: 14
         handler: App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler
     goal.organize_tournament:
         label: Organize a tournament

@@ -53,6 +53,8 @@ final class OrganizeTournamentGoalHandlerTest extends TestCase
         self::assertSame(3, $settlement->getFame());
 
         self::assertSame([
+            'announce_day'           => 1,
+            'registration_close_day' => 2,
             'center_x'        => 3,
             'center_y'        => 7,
             'radius'          => 6,
