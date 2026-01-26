@@ -14,6 +14,7 @@ class Tournament
 {
     public const STATUS_SCHEDULED = 'scheduled';
     public const STATUS_RESOLVED  = 'resolved';
+    public const STATUS_CANCELED = 'canceled';
 
     #[ORM\Id]
     #[ORM\GeneratedValue]
@@ -128,9 +129,19 @@ class Tournament
         $this->status = self::STATUS_RESOLVED;
     }
 
+    public function markCanceled(): void
+    {
+        $this->status = self::STATUS_CANCELED;
+    }
+
     public function isResolved(): bool
     {
         return $this->status === self::STATUS_RESOLVED;
+    }
+
+    public function isCanceled(): bool
+    {
+        return $this->status === self::STATUS_CANCELED;
     }
 
     public function getRequestEventId(): ?int
@@ -143,4 +154,3 @@ class Tournament
         return $this->createdAt;
     }
 }
-

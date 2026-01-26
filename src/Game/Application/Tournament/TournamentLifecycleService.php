@@ -137,10 +137,13 @@ final class TournamentLifecycleService
 
             $groupDay = $tournament->getAnnounceDay() + 1;
             if ($worldDay === $groupDay) {
-                $this->runGroupStage($tournament, $worldDay, $charactersById, $goalsByCharacterId);
+                $events = array_merge(
+                    $events,
+                    $this->runGroupStage($tournament, $worldDay, $charactersById, $goalsByCharacterId),
+                );
             }
 
-            if ($worldDay === $tournament->getResolveDay()) {
+            if ($tournament->getStatus() === Tournament::STATUS_SCHEDULED && $worldDay === $tournament->getResolveDay()) {
                 $events = array_merge(
                     $events,
                     $this->resolveKnockout($tournament, $worldDay, $charactersById, $goalsByCharacterId, $economyCatalog),
@@ -204,8 +207,10 @@ final class TournamentLifecycleService
     /**
      * @param array<int,Character>     $charactersById
      * @param array<int,CharacterGoal> $goalsByCharacterId
+     *
+     * @return list<CharacterEvent>
      */
-    private function runGroupStage(Tournament $tournament, int $worldDay, array $charactersById, array $goalsByCharacterId): void
+    private function runGroupStage(Tournament $tournament, int $worldDay, array $charactersById, array $goalsByCharacterId): array
     {
         $participantRepo = $this->entityManager->getRepository(TournamentParticipant::class);
         /** @var list<TournamentParticipant> $participants */
@@ -230,14 +235,8 @@ final class TournamentLifecycleService
             $present[] = $c;
         }
 
-        if (count($present) < 2) {
-            foreach ($present as $c) {
-                $cid = (int)$c->getId();
-                if (isset($goalsByCharacterId[$cid]) && $goalsByCharacterId[$cid]->getCurrentGoalCode() === 'goal.participate_tournament') {
-                    $goalsByCharacterId[$cid]->setCurrentGoalComplete(true);
-                }
-            }
-            return;
+        if (count($present) < 4) {
+            return $this->cancelTournamentInsufficientParticipants($tournament, $worldDay, $participants, $goalsByCharacterId);
         }
 
         usort($present, function (Character $a, Character $b): int {
@@ -338,6 +337,57 @@ final class TournamentLifecycleService
                 }
             }
         }
+
+        return [];
+    }
+
+    /**
+     * @param list<TournamentParticipant> $participants
+     * @param array<int,CharacterGoal>    $goalsByCharacterId
+     *
+     * @return list<CharacterEvent>
+     */
+    private function cancelTournamentInsufficientParticipants(
+        Tournament $tournament,
+        int        $worldDay,
+        array      $participants,
+        array      $goalsByCharacterId,
+    ): array
+    {
+        $tournament->getSettlement()->addToTreasury($tournament->getPrizePool());
+
+        foreach ($participants as $p) {
+            $cid = $p->getCharacter()->getId();
+            if ($cid === null) {
+                continue;
+            }
+
+            $p->markEliminated($worldDay);
+            $p->setFinalRank(null);
+
+            if (isset($goalsByCharacterId[(int)$cid]) && $goalsByCharacterId[(int)$cid]->getCurrentGoalCode() === 'goal.participate_tournament') {
+                $goalsByCharacterId[(int)$cid]->setCurrentGoalComplete(true);
+            }
+        }
+
+        $tournament->markCanceled();
+
+        $event = new CharacterEvent(
+            world: $tournament->getWorld(),
+            character: null,
+            type: 'tournament_canceled',
+            day: $worldDay,
+            data: [
+                'tournament_id' => $tournament->getId(),
+                'announce_day'  => $tournament->getAnnounceDay(),
+                'center_x'      => $tournament->getSettlement()->getX(),
+                'center_y'      => $tournament->getSettlement()->getY(),
+                'reason'        => 'insufficient_participants',
+                'participants'  => count($participants),
+            ],
+        );
+
+        return [$event];
     }
 
     /**
@@ -354,6 +404,10 @@ final class TournamentLifecycleService
         EconomyCatalog $economyCatalog,
     ): array
     {
+        if ($tournament->getStatus() !== Tournament::STATUS_SCHEDULED) {
+            return [];
+        }
+
         $participantRepo = $this->entityManager->getRepository(TournamentParticipant::class);
         /** @var list<TournamentParticipant> $participants */
         $participants = $participantRepo->findBy(['tournament' => $tournament], ['seed' => 'ASC', 'id' => 'ASC']);
@@ -559,4 +613,3 @@ final class TournamentLifecycleService
         return (int)hexdec(substr($hash, 0, 8));
     }
 }
-
