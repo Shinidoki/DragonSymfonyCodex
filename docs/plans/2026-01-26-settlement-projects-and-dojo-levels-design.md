@@ -1,5 +1,3 @@
-codex resume 019bef8b-31eb-7e72-b314-c18d87e01e06
-
 # Settlement Projects + Dojo Levels (Workforce-Driven) — Design
 
 **Date:** 2026-01-26
