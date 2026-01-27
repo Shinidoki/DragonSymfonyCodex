@@ -26,6 +26,10 @@ life_goals:
                 weight: 10
             -   code: goal.participate_tournament
                 weight: 1
+            -   code: goal.challenge_dojo_master
+                weight: 1
+            -   code: goal.claim_dojo
+                weight: 1
             -   code: goal.earn_money
                 weight: 3
             -   code: goal.find_job
@@ -93,6 +97,16 @@ current_goals:
         interruptible: true
         work_focus_target: 0
         handler: App\Game\Domain\Goal\Handlers\StartDojoProjectGoalHandler
+    goal.claim_dojo:
+        label: Claim a dojo
+        interruptible: true
+        work_focus_target: 0
+        handler: App\Game\Domain\Goal\Handlers\ClaimDojoGoalHandler
+    goal.challenge_dojo_master:
+        label: Challenge dojo master
+        interruptible: true
+        work_focus_target: 0
+        handler: App\Game\Domain\Goal\Handlers\ChallengeDojoMasterGoalHandler
 
 npc_life_goals:
     civilian:

@@ -1,5 +1,9 @@
 buildings:
     dojo:
+        rules:
+            challenge_cooldown_days: 7
+            training_fee_base: 10
+            training_fee_per_level: 5
         levels:
             1:
                 materials_cost: 500

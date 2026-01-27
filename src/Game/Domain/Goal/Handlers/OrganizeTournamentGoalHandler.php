@@ -26,35 +26,61 @@ final class OrganizeTournamentGoalHandler implements CurrentGoalHandlerInterface
             );
         }
 
-        $settlements = $context->settlementTiles;
-        if ($settlements === []) {
-            return new GoalStepResult(
-                plan: new DailyPlan(DailyActivity::Rest),
-                data: $data,
-                completed: false,
-            );
-        }
-
         $width  = $world->getWidth();
         $height = $world->getHeight();
 
-        $targetX = $data['target_x'] ?? null;
-        $targetY = $data['target_y'] ?? null;
+        $jobCode = $character->getEmploymentJobCode();
+        if ($jobCode === 'mayor') {
+            $sx = $character->getEmploymentSettlementX();
+            $sy = $character->getEmploymentSettlementY();
+            if (!is_int($sx) || !is_int($sy)) {
+                return new GoalStepResult(
+                    plan: new DailyPlan(DailyActivity::Rest),
+                    data: $data,
+                    completed: false,
+                );
+            }
 
-        $target = null;
-        if (is_int($targetX) && is_int($targetY)) {
-            if ($targetX >= 0 && $targetY >= 0 && ($width <= 0 || $targetX < $width) && ($height <= 0 || $targetY < $height)) {
-                foreach ($settlements as $s) {
-                    if ($s->x === $targetX && $s->y === $targetY) {
-                        $target = $s;
-                        break;
+            if ($sx < 0 || $sy < 0 || ($width > 0 && $sx >= $width) || ($height > 0 && $sy >= $height)) {
+                return new GoalStepResult(
+                    plan: new DailyPlan(DailyActivity::Rest),
+                    data: $data,
+                    completed: false,
+                );
+            }
+
+            // Mayors may only host tournaments in their own settlement.
+            $target           = new TileCoord($sx, $sy);
+            $data['target_x'] = $sx;
+            $data['target_y'] = $sy;
+        } else {
+            $settlements = $context->settlementTiles;
+            if ($settlements === []) {
+                return new GoalStepResult(
+                    plan: new DailyPlan(DailyActivity::Rest),
+                    data: $data,
+                    completed: false,
+                );
+            }
+
+            $targetX = $data['target_x'] ?? null;
+            $targetY = $data['target_y'] ?? null;
+
+            $target = null;
+            if (is_int($targetX) && is_int($targetY)) {
+                if ($targetX >= 0 && $targetY >= 0 && ($width <= 0 || $targetX < $width) && ($height <= 0 || $targetY < $height)) {
+                    foreach ($settlements as $s) {
+                        if ($s->x === $targetX && $s->y === $targetY) {
+                            $target = $s;
+                            break;
+                        }
                     }
                 }
             }
-        }
 
-        if (!$target instanceof TileCoord) {
-            $target = $this->nearestSettlement(new TileCoord($character->getTileX(), $character->getTileY()), $settlements);
+            if (!$target instanceof TileCoord) {
+                $target = $this->nearestSettlement(new TileCoord($character->getTileX(), $character->getTileY()), $settlements);
+            }
         }
 
         if (!$target instanceof TileCoord) {

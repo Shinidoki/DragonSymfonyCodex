@@ -8,6 +8,7 @@ use App\Entity\Settlement;
 use App\Entity\SettlementBuilding;
 use App\Entity\SettlementProject;
 use App\Entity\World;
+use App\Entity\WorldMapTile;
 use App\Game\Domain\Economy\EconomyCatalog;
 use App\Repository\SettlementBuildingRepository;
 use App\Repository\SettlementProjectRepository;
@@ -259,6 +260,17 @@ final class SettlementProjectLifecycleService
                     $this->entityManager->persist($building);
                 } else {
                     $building->setLevel(max($building->getLevel(), $project->getTargetLevel()));
+                }
+
+                if ($project->getBuildingCode() === 'dojo' && $project->getTargetLevel() >= 1) {
+                    $tile = $this->entityManager->getRepository(WorldMapTile::class)->findOneBy([
+                        'world' => $world,
+                        'x'     => $settlement->getX(),
+                        'y'     => $settlement->getY(),
+                    ]);
+                    if ($tile instanceof WorldMapTile && !$tile->hasDojo()) {
+                        $tile->setHasDojo(true);
+                    }
                 }
 
                 $events[] = new CharacterEvent(

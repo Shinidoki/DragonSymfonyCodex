@@ -64,6 +64,8 @@ final class SimulationClock
         array $settlementBuildingsByCoord = [],
         array $activeSettlementProjectsByCoord = [],
         array $dojoTrainingMultipliersByCoord = [],
+        array $dojoMasterCharacterIdByCoord = [],
+        array $dojoTrainingFeesByCoord = [],
     ): array
     {
         if ($days < 0) {
@@ -79,6 +81,7 @@ final class SimulationClock
 
         $dojoIndex = $this->buildDojoIndex($dojoTiles);
         $settlementsByCoord = $this->buildSettlementIndex($settlements);
+        $charactersById = $this->buildCharacterIndex($characters);
 
         for ($i = 0; $i < $days; $i++) {
             $world->advanceDays(1);
@@ -175,17 +178,50 @@ final class SimulationClock
                 if ($plan->activity === DailyActivity::Train) {
                     $coordKey  = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
                     $levelMult = $dojoTrainingMultipliersByCoord[$coordKey] ?? null;
+                    $masterId = $dojoMasterCharacterIdByCoord[$coordKey] ?? null;
 
-                    if (is_float($levelMult) || is_int($levelMult)) {
+                    if ((is_float($levelMult) || is_int($levelMult)) && is_int($masterId) && $masterId > 0) {
                         $multiplier = (float)$levelMult;
                     } else {
-                        $multiplier = isset($dojoIndex[$coordKey])
+                        $multiplier = is_int($masterId) && $masterId > 0
                             ? TrainingContext::Dojo->multiplier()
                             : TrainingContext::Wilderness->multiplier();
                     }
 
                     $trainFraction = max(0.0, 1.0 - $workFraction);
                     if ($trainFraction > 0.0) {
+                        if ($economyCatalog instanceof EconomyCatalog && is_int($masterId) && $masterId > 0) {
+                            $fee = $dojoTrainingFeesByCoord[$coordKey] ?? null;
+                            if (is_int($fee) && $fee > 0) {
+                                if ($character->getMoney() < $fee) {
+                                    // Can't pay for dojo training today.
+                                    $this->advanceTransformationDay($character, $transformations);
+                                    continue;
+                                }
+
+                                $taxRate = $economyCatalog->settlementTaxRate();
+                                $tax     = (int)floor($fee * $taxRate);
+                                if ($tax < 0) {
+                                    $tax = 0;
+                                }
+                                if ($tax > $fee) {
+                                    $tax = $fee;
+                                }
+
+                                $character->addMoney(-$fee);
+
+                                $settlement = $settlementsByCoord[$coordKey] ?? null;
+                                if ($settlement instanceof Settlement && $tax > 0) {
+                                    $settlement->addToTreasury($tax);
+                                }
+
+                                $master = $charactersById[(int)$masterId] ?? null;
+                                if ($master instanceof Character) {
+                                    $master->addMoney($fee - $tax);
+                                }
+                            }
+                        }
+
                         $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $multiplier * $trainFraction);
                         $character->applyCoreAttributes($after);
                     }
@@ -270,6 +306,8 @@ final class SimulationClock
         array $settlementBuildingsByCoord = [],
         array $activeSettlementProjectsByCoord = [],
         array $dojoTrainingMultipliersByCoord = [],
+        array $dojoMasterCharacterIdByCoord = [],
+        array $dojoTrainingFeesByCoord = [],
     ): array
     {
         if ($days < 0) {
@@ -291,6 +329,7 @@ final class SimulationClock
 
         $dojoIndex = $this->buildDojoIndex($dojoTiles);
         $settlementsByCoord = $this->buildSettlementIndex($settlements);
+        $charactersById = $this->buildCharacterIndex($characters);
 
         for ($i = 0; $i < $days; $i++) {
             $world->advanceDays(1);
@@ -302,6 +341,41 @@ final class SimulationClock
 
                 if ((int)$character->getId() === $playerCharacterId) {
                     if ($trainingMultiplier !== null) {
+                        $coordKey = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
+                        $masterId = $dojoMasterCharacterIdByCoord[$coordKey] ?? null;
+
+                        if ($economyCatalog instanceof EconomyCatalog && is_int($masterId) && $masterId > 0) {
+                            $fee = $dojoTrainingFeesByCoord[$coordKey] ?? null;
+                            if (is_int($fee) && $fee > 0) {
+                                if ($character->getMoney() >= $fee) {
+                                    $taxRate = $economyCatalog->settlementTaxRate();
+                                    $tax     = (int)floor($fee * $taxRate);
+                                    if ($tax < 0) {
+                                        $tax = 0;
+                                    }
+                                    if ($tax > $fee) {
+                                        $tax = $fee;
+                                    }
+
+                                    $character->addMoney(-$fee);
+
+                                    $settlement = $settlementsByCoord[$coordKey] ?? null;
+                                    if ($settlement instanceof Settlement && $tax > 0) {
+                                        $settlement->addToTreasury($tax);
+                                    }
+
+                                    $master = $charactersById[(int)$masterId] ?? null;
+                                    if ($master instanceof Character) {
+                                        $master->addMoney($fee - $tax);
+                                    }
+                                } else {
+                                    // Can't pay for dojo training today; skip training.
+                                    $this->advanceTransformationDay($character, $transformations);
+                                    continue;
+                                }
+                            }
+                        }
+
                         $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $trainingMultiplier);
                         $character->applyCoreAttributes($after);
                     }
@@ -640,6 +714,24 @@ final class SimulationClock
         }
 
         return $byCoord;
+    }
+
+    /**
+     * @param list<Character> $characters
+     *
+     * @return array<int,Character>
+     */
+    private function buildCharacterIndex(array $characters): array
+    {
+        $byId = [];
+        foreach ($characters as $character) {
+            $id = $character->getId();
+            if (is_int($id) && $id > 0) {
+                $byId[$id] = $character;
+            }
+        }
+
+        return $byId;
     }
 
     /**

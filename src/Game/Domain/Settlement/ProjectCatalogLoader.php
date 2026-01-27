@@ -27,6 +27,12 @@ final class ProjectCatalogLoader
             throw new \InvalidArgumentException('Project catalog must define buildings.dojo.');
         }
 
+        $rules = $dojo['rules'] ?? [];
+        if (!is_array($rules)) {
+            $rules = [];
+        }
+        $dojoRules = $this->parseDojoRules($rules);
+
         $levels = $dojo['levels'] ?? null;
         if (!is_array($levels) || $levels === []) {
             throw new \InvalidArgumentException('Project catalog must define buildings.dojo.levels.');
@@ -55,7 +61,35 @@ final class ProjectCatalogLoader
             throw new \InvalidArgumentException('No valid dojo level definitions found.');
         }
 
-        return new ProjectCatalog($dojoLevels);
+        return new ProjectCatalog($dojoLevels, $dojoRules);
+    }
+
+    /**
+     * @param array<string,mixed> $rules
+     *
+     * @return array{challenge_cooldown_days:int,training_fee_base:int,training_fee_per_level:int}
+     */
+    private function parseDojoRules(array $rules): array
+    {
+        $cooldown = $rules['challenge_cooldown_days'] ?? 7;
+        $feeBase  = $rules['training_fee_base'] ?? 10;
+        $feePer   = $rules['training_fee_per_level'] ?? 5;
+
+        if (!is_int($cooldown) || $cooldown < 1) {
+            throw new \InvalidArgumentException('Dojo rules.challenge_cooldown_days must be an int >= 1.');
+        }
+        if (!is_int($feeBase) || $feeBase < 0) {
+            throw new \InvalidArgumentException('Dojo rules.training_fee_base must be an int >= 0.');
+        }
+        if (!is_int($feePer) || $feePer < 0) {
+            throw new \InvalidArgumentException('Dojo rules.training_fee_per_level must be an int >= 0.');
+        }
+
+        return [
+            'challenge_cooldown_days' => $cooldown,
+            'training_fee_base'       => $feeBase,
+            'training_fee_per_level'  => $feePer,
+        ];
     }
 
     /**

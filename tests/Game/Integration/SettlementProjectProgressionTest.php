@@ -8,9 +8,11 @@ use App\Entity\Settlement;
 use App\Entity\SettlementBuilding;
 use App\Entity\SettlementProject;
 use App\Entity\World;
+use App\Entity\WorldMapTile;
 use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
 use App\Game\Application\Settlement\SettlementProjectLifecycleService;
 use App\Game\Domain\Economy\EconomyCatalog;
+use App\Game\Domain\Map\Biome;
 use App\Game\Domain\Race;
 use App\Game\Domain\Settlement\ProjectCatalogLoader;
 use App\Repository\SettlementBuildingRepository;
@@ -98,6 +100,10 @@ final class SettlementProjectProgressionTest extends KernelTestCase
         $settlement->addToTreasury(20_000);
         $entityManager->persist($settlement);
 
+        $tile = new WorldMapTile($world, 0, 0, Biome::Plains);
+        $tile->setHasSettlement(true);
+        $entityManager->persist($tile);
+
         $event = new CharacterEvent(
             world: $world,
             character: null,
@@ -176,5 +182,8 @@ final class SettlementProjectProgressionTest extends KernelTestCase
         $dojo      = $buildings->findOneBySettlementAndCode($settlement, 'dojo');
         self::assertNotNull($dojo);
         self::assertSame(1, $dojo->getLevel());
+
+        $entityManager->refresh($tile);
+        self::assertTrue($tile->hasDojo(), 'Completing a dojo project must set hasDojo=true on the world tile.');
     }
 }

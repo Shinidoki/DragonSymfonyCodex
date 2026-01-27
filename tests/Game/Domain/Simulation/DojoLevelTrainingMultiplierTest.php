@@ -31,13 +31,14 @@ final class DojoLevelTrainingMultiplierTest extends TestCase
             intensity: TrainingIntensity::Hard,
             dojoTiles: [new TileCoord(0, 0)],
             dojoTrainingMultipliersByCoord: ['0:0' => 1.35],
+            dojoMasterCharacterIdByCoord: ['0:0' => 1],
         );
 
         // Hard intensity delta=3; ceil(3 * 1.35) = 5
         self::assertSame($before + 5, $character->getStrength());
     }
 
-    public function testFallsBackToDefaultDojoMultiplierWhenNoLevelMapProvided(): void
+    public function testFallsBackToWildernessMultiplierWhenNoDojoMasterExists(): void
     {
         $world = new World('seed-1');
 
@@ -56,8 +57,7 @@ final class DojoLevelTrainingMultiplierTest extends TestCase
             dojoTiles: [new TileCoord(0, 0)],
         );
 
-        // Hard intensity delta=3; ceil(3 * 1.25) = 4 (TrainingContext::Dojo multiplier)
-        self::assertSame($before + 4, $character->getStrength());
+        // Hard intensity delta=3; no dojo master => wilderness multiplier 1.0 => ceil(3 * 1.0) = 3
+        self::assertSame($before + 3, $character->getStrength());
     }
 }
-

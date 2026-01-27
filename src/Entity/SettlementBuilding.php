@@ -27,6 +27,13 @@ class SettlementBuilding
     #[ORM\Column(options: ['default' => 0])]
     private int $level = 0;
 
+    #[ORM\ManyToOne(targetEntity: Character::class)]
+    #[ORM\JoinColumn(nullable: true, onDelete: 'SET NULL')]
+    private ?Character $masterCharacter = null;
+
+    #[ORM\Column(options: ['default' => -1])]
+    private int $masterLastChallengedDay = -1;
+
     #[ORM\Column(type: Types::DATETIME_IMMUTABLE)]
     private \DateTimeImmutable $createdAt;
 
@@ -82,6 +89,30 @@ class SettlementBuilding
         }
 
         $this->level += $by;
+    }
+
+    public function getMasterCharacter(): ?Character
+    {
+        return $this->masterCharacter;
+    }
+
+    public function setMasterCharacter(?Character $masterCharacter): void
+    {
+        $this->masterCharacter = $masterCharacter;
+    }
+
+    public function getMasterLastChallengedDay(): int
+    {
+        return $this->masterLastChallengedDay;
+    }
+
+    public function setMasterLastChallengedDay(int $day): void
+    {
+        if ($day < -1) {
+            throw new \InvalidArgumentException('day must be >= -1.');
+        }
+
+        $this->masterLastChallengedDay = $day;
     }
 
     public function getCreatedAt(): \DateTimeImmutable

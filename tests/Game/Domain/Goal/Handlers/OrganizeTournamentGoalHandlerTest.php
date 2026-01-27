@@ -10,11 +10,85 @@ use App\Game\Domain\Economy\EconomyCatalog;
 use App\Game\Domain\Goal\GoalContext;
 use App\Game\Domain\Goal\Handlers\OrganizeTournamentGoalHandler;
 use App\Game\Domain\Map\TileCoord;
+use App\Game\Domain\Npc\DailyActivity;
 use App\Game\Domain\Race;
 use PHPUnit\Framework\TestCase;
 
 final class OrganizeTournamentGoalHandlerTest extends TestCase
 {
+    public function testMayorTargetsEmploymentSettlementOverNearestSettlement(): void
+    {
+        $world = new World('seed-1');
+        $world->setMapSize(20, 20);
+
+        $home = new Settlement($world, 5, 5);
+        $home->addToTreasury(1_000);
+
+        $near = new Settlement($world, 1, 0);
+        $near->addToTreasury(1_000);
+
+        $character = new Character($world, 'Mayor', Race::Human);
+        $character->setEmployment('mayor', 5, 5);
+        $character->setTilePosition(0, 0);
+
+        $handler = new OrganizeTournamentGoalHandler();
+        $result  = $handler->step(
+            character: $character,
+            world: $world,
+            data: [],
+            context: new GoalContext(
+                dojoTiles: [],
+                settlementTiles: [new TileCoord(5, 5), new TileCoord(1, 0)],
+                settlementsByCoord: ['5:5' => $home, '1:0' => $near],
+                economyCatalog: $this->economyCatalog(),
+            ),
+        );
+
+        self::assertFalse($result->completed);
+        self::assertSame(DailyActivity::Travel, $result->plan->activity);
+        self::assertSame(5, $result->plan->travelTarget?->x);
+        self::assertSame(5, $result->plan->travelTarget?->y);
+        self::assertSame(5, $result->data['target_x']);
+        self::assertSame(5, $result->data['target_y']);
+    }
+
+    public function testMayorIgnoresSettlementTileListAndOnlyTargetsOwnSettlement(): void
+    {
+        $world = new World('seed-1');
+        $world->setMapSize(20, 20);
+
+        $home = new Settlement($world, 5, 5);
+        $home->addToTreasury(1_000);
+
+        $other = new Settlement($world, 1, 0);
+        $other->addToTreasury(1_000);
+
+        $character = new Character($world, 'Mayor', Race::Human);
+        $character->setEmployment('mayor', 5, 5);
+        $character->setTilePosition(0, 0);
+
+        $handler = new OrganizeTournamentGoalHandler();
+        $result  = $handler->step(
+            character: $character,
+            world: $world,
+            data: ['target_x' => 1, 'target_y' => 0],
+            context: new GoalContext(
+                dojoTiles: [],
+                // Missing the mayor's own settlement tile on purpose.
+                settlementTiles: [new TileCoord(1, 0)],
+                settlementsByCoord: ['5:5' => $home, '1:0' => $other],
+                economyCatalog: $this->economyCatalog(),
+            ),
+        );
+
+        self::assertFalse($result->completed);
+        self::assertSame(DailyActivity::Travel, $result->plan->activity);
+        self::assertSame(5, $result->plan->travelTarget?->x);
+        self::assertSame(5, $result->plan->travelTarget?->y);
+        self::assertSame(5, $result->data['target_x']);
+        self::assertSame(5, $result->data['target_y']);
+    }
+
     public function testEmitsTournamentAnnouncementEventAndCompletes(): void
     {
         $world = new World('seed-1');

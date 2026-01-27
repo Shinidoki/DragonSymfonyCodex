@@ -16,6 +16,10 @@ final class ProjectCatalogLoaderTest extends TestCase
         self::assertSame(1.35, $catalog->dojoTrainingMultiplier(2));
         self::assertSame(1.5, $catalog->dojoTrainingMultiplier(3));
 
+        self::assertSame(10, $catalog->dojoTrainingFee(1));
+        self::assertSame(15, $catalog->dojoTrainingFee(2));
+        self::assertSame(7, $catalog->dojoChallengeCooldownDays());
+
         self::assertSame(1, $catalog->dojoNextLevel(0));
         self::assertSame(2, $catalog->dojoNextLevel(1));
         self::assertSame(3, $catalog->dojoNextLevel(2));

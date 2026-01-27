@@ -61,6 +61,16 @@ final class TournamentLifecycleService
 
         $tournamentRepo = $this->entityManager->getRepository(Tournament::class);
 
+        $scheduledBySettlementKey = [];
+        /** @var list<Tournament> $alreadyScheduled */
+        $alreadyScheduled = $tournamentRepo->findBy(['world' => $world, 'status' => Tournament::STATUS_SCHEDULED], ['id' => 'ASC']);
+        foreach ($alreadyScheduled as $t) {
+            $s                              = $t->getSettlement();
+            $sid                            = $s->getId();
+            $key                            = $sid !== null ? sprintf('id:%d', (int)$sid) : sprintf('coord:%d:%d', $s->getX(), $s->getY());
+            $scheduledBySettlementKey[$key] = true;
+        }
+
         foreach ($emittedEvents as $event) {
             if ($event->getType() !== 'tournament_announced') {
                 continue;
@@ -88,6 +98,14 @@ final class TournamentLifecycleService
 
             $settlement = $settlementsByCoord[sprintf('%d:%d', $x, $y)] ?? null;
             if (!$settlement instanceof Settlement) {
+                continue;
+            }
+
+            $settlementId  = $settlement->getId();
+            $settlementKey = $settlementId !== null
+                ? sprintf('id:%d', (int)$settlementId)
+                : sprintf('coord:%d:%d', $settlement->getX(), $settlement->getY());
+            if (isset($scheduledBySettlementKey[$settlementKey])) {
                 continue;
             }
 
@@ -125,6 +143,8 @@ final class TournamentLifecycleService
                 requestEventId: $eventId,
             );
             $this->entityManager->persist($tournament);
+
+            $scheduledBySettlementKey[$settlementKey] = true;
         }
 
         $this->entityManager->flush();
