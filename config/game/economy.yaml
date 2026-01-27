@@ -35,6 +35,10 @@ jobs:
         label: Guard
         wage_weight: 2
         work_radius: 3
+    mayor:
+        label: Mayor
+        wage_weight: 5
+        work_radius: 0
 
 employment_pools:
     civilian:

@@ -61,6 +61,9 @@ final class SimulationClock
         ?GoalCatalog $goalCatalog = null,
         array           $settlements = [],
         ?EconomyCatalog $economyCatalog = null,
+        array $settlementBuildingsByCoord = [],
+        array $activeSettlementProjectsByCoord = [],
+        array $dojoTrainingMultipliersByCoord = [],
     ): array
     {
         if ($days < 0) {
@@ -109,7 +112,15 @@ final class SimulationClock
                                 world: $world,
                                 currentGoalCode: $currentGoalCode,
                                 data: $goal->getCurrentGoalData() ?? [],
-                                context: new GoalContext($dojoTiles, $settlementTiles, $settlementsByCoord, $economyCatalog, $events),
+                                context: new GoalContext(
+                                    dojoTiles: $dojoTiles,
+                                    settlementTiles: $settlementTiles,
+                                    settlementsByCoord: $settlementsByCoord,
+                                    settlementBuildingsByCoord: $settlementBuildingsByCoord,
+                                    activeSettlementProjectsByCoord: $activeSettlementProjectsByCoord,
+                                    economyCatalog: $economyCatalog,
+                                    events: $events,
+                                ),
                                 catalog: $goalCatalog,
                             );
 
@@ -162,9 +173,16 @@ final class SimulationClock
                 }
 
                 if ($plan->activity === DailyActivity::Train) {
-                    $multiplier = isset($dojoIndex[sprintf('%d:%d', $character->getTileX(), $character->getTileY())])
-                        ? TrainingContext::Dojo->multiplier()
-                        : TrainingContext::Wilderness->multiplier();
+                    $coordKey  = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
+                    $levelMult = $dojoTrainingMultipliersByCoord[$coordKey] ?? null;
+
+                    if (is_float($levelMult) || is_int($levelMult)) {
+                        $multiplier = (float)$levelMult;
+                    } else {
+                        $multiplier = isset($dojoIndex[$coordKey])
+                            ? TrainingContext::Dojo->multiplier()
+                            : TrainingContext::Wilderness->multiplier();
+                    }
 
                     $trainFraction = max(0.0, 1.0 - $workFraction);
                     if ($trainFraction > 0.0) {
@@ -203,6 +221,10 @@ final class SimulationClock
                 settlementsByCoord: $settlementsByCoord,
                 ledgerBySettlement: $workLedger,
             );
+
+            if ($economyCatalog instanceof EconomyCatalog && $settlementsByCoord !== []) {
+                $this->enforceSingleMayorPerSettlement($settlementsByCoord, $characters, $economyCatalog);
+            }
 
             if ($economyCatalog instanceof EconomyCatalog && $goalCatalog instanceof GoalCatalog) {
                 $emitted = array_merge(
@@ -245,6 +267,9 @@ final class SimulationClock
         ?GoalCatalog $goalCatalog = null,
         array           $settlements = [],
         ?EconomyCatalog $economyCatalog = null,
+        array $settlementBuildingsByCoord = [],
+        array $activeSettlementProjectsByCoord = [],
+        array $dojoTrainingMultipliersByCoord = [],
     ): array
     {
         if ($days < 0) {
@@ -309,7 +334,15 @@ final class SimulationClock
                                 world: $world,
                                 currentGoalCode: $currentGoalCode,
                                 data: $goal->getCurrentGoalData() ?? [],
-                                context: new GoalContext($dojoTiles, $settlementTiles, $settlementsByCoord, $economyCatalog, $events),
+                                context: new GoalContext(
+                                    dojoTiles: $dojoTiles,
+                                    settlementTiles: $settlementTiles,
+                                    settlementsByCoord: $settlementsByCoord,
+                                    settlementBuildingsByCoord: $settlementBuildingsByCoord,
+                                    activeSettlementProjectsByCoord: $activeSettlementProjectsByCoord,
+                                    economyCatalog: $economyCatalog,
+                                    events: $events,
+                                ),
                                 catalog: $goalCatalog,
                             );
 
@@ -362,9 +395,16 @@ final class SimulationClock
                 }
 
                 if ($plan->activity === DailyActivity::Train) {
-                    $multiplier = isset($dojoIndex[sprintf('%d:%d', $character->getTileX(), $character->getTileY())])
-                        ? TrainingContext::Dojo->multiplier()
-                        : TrainingContext::Wilderness->multiplier();
+                    $coordKey  = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
+                    $levelMult = $dojoTrainingMultipliersByCoord[$coordKey] ?? null;
+
+                    if (is_float($levelMult) || is_int($levelMult)) {
+                        $multiplier = (float)$levelMult;
+                    } else {
+                        $multiplier = isset($dojoIndex[$coordKey])
+                            ? TrainingContext::Dojo->multiplier()
+                            : TrainingContext::Wilderness->multiplier();
+                    }
 
                     $trainFraction = max(0.0, 1.0 - $workFraction);
                     if ($trainFraction > 0.0) {
@@ -600,6 +640,115 @@ final class SimulationClock
         }
 
         return $byCoord;
+    }
+
+    /**
+     * Enforce: exactly one mayor per settlement at all times.
+     *
+     * @param array<string,Settlement> $settlementsByCoord
+     * @param list<Character>          $characters
+     */
+    private function enforceSingleMayorPerSettlement(array $settlementsByCoord, array $characters, EconomyCatalog $economyCatalog): void
+    {
+        $fallbackJob = $this->fallbackNonMayorJob($economyCatalog);
+
+        foreach ($settlementsByCoord as $settlement) {
+            $sx = $settlement->getX();
+            $sy = $settlement->getY();
+
+            $employedHere = [];
+            $onTile       = [];
+            $mayorsHere   = [];
+
+            foreach ($characters as $character) {
+                if ($character->getTileX() === $sx && $character->getTileY() === $sy) {
+                    $onTile[] = $character;
+                }
+
+                if (!$character->isEmployed()) {
+                    continue;
+                }
+
+                if ((int)$character->getEmploymentSettlementX() !== $sx || (int)$character->getEmploymentSettlementY() !== $sy) {
+                    continue;
+                }
+
+                $employedHere[] = $character;
+                if ($character->getEmploymentJobCode() === 'mayor') {
+                    $mayorsHere[] = $character;
+                }
+            }
+
+            if (count($mayorsHere) === 1) {
+                continue;
+            }
+
+            $candidates = $employedHere !== [] ? $employedHere : $onTile;
+            if ($candidates === []) {
+                continue;
+            }
+
+            $picked = $this->pickMayorCandidate($candidates);
+            if ($picked instanceof Character) {
+                $picked->setEmployment('mayor', $sx, $sy);
+
+                foreach ($mayorsHere as $mayor) {
+                    if ($mayor === $picked) {
+                        continue;
+                    }
+
+                    if (is_string($fallbackJob)) {
+                        $mayor->setEmployment($fallbackJob, $sx, $sy);
+                    } else {
+                        $mayor->clearEmployment();
+                    }
+                }
+            }
+        }
+    }
+
+    private function fallbackNonMayorJob(EconomyCatalog $economyCatalog): ?string
+    {
+        foreach (array_keys($economyCatalog->jobs()) as $code) {
+            if (!is_string($code) || $code === '' || $code === 'mayor') {
+                continue;
+            }
+
+            return $code;
+        }
+
+        return null;
+    }
+
+    /**
+     * @param list<Character> $candidates
+     */
+    private function pickMayorCandidate(array $candidates): ?Character
+    {
+        usort($candidates, static function (Character $a, Character $b): int {
+            if ($a->getInfluence() !== $b->getInfluence()) {
+                return $b->getInfluence() <=> $a->getInfluence();
+            }
+            if ($a->getMoney() !== $b->getMoney()) {
+                return $b->getMoney() <=> $a->getMoney();
+            }
+
+            $ai = $a->getId();
+            $bi = $b->getId();
+            if ($ai === null && $bi === null) {
+                return 0;
+            }
+            if ($ai === null) {
+                return 1;
+            }
+            if ($bi === null) {
+                return -1;
+            }
+
+            return (int)$ai <=> (int)$bi;
+        });
+
+        return $candidates[0] ?? null;
     }
 
     private function advanceTransformationDay(Character $character, TransformationService $service): void

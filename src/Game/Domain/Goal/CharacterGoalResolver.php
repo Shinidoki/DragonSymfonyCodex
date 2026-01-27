@@ -92,8 +92,8 @@ final readonly class CharacterGoalResolver
             $goal->setLastProcessedEventId($lastProcessed);
         }
 
-        $this->enforceCompatibility($goal, $catalog);
-        $this->ensureCurrentGoal($goal, $catalog);
+        $this->enforceCompatibility($character, $goal, $catalog);
+        $this->ensureCurrentGoal($character, $goal, $catalog);
 
         $goal->setLastResolvedDay($worldDay);
     }
@@ -274,9 +274,9 @@ final readonly class CharacterGoalResolver
         }
     }
 
-    private function enforceCompatibility(CharacterGoal $goal, GoalCatalog $catalog): void
+    private function enforceCompatibility(Character $character, CharacterGoal $goal, GoalCatalog $catalog): void
     {
-        $lifeGoal    = $goal->getLifeGoalCode();
+        $lifeGoal = $this->effectiveLifeGoalCode($character, $goal, $catalog);
         $currentGoal = $goal->getCurrentGoalCode();
 
         if ($lifeGoal === null || $currentGoal === null) {
@@ -290,13 +290,13 @@ final readonly class CharacterGoalResolver
         }
     }
 
-    private function ensureCurrentGoal(CharacterGoal $goal, GoalCatalog $catalog): void
+    private function ensureCurrentGoal(Character $character, CharacterGoal $goal, GoalCatalog $catalog): void
     {
         if ($goal->getCurrentGoalCode() !== null && !$goal->isCurrentGoalComplete()) {
             return;
         }
 
-        $lifeGoal = $goal->getLifeGoalCode();
+        $lifeGoal = $this->effectiveLifeGoalCode($character, $goal, $catalog);
         if ($lifeGoal === null) {
             return;
         }
@@ -321,6 +321,20 @@ final readonly class CharacterGoalResolver
                 return;
             }
         }
+    }
+
+    private function effectiveLifeGoalCode(Character $character, CharacterGoal $goal, GoalCatalog $catalog): ?string
+    {
+        $currentGoalCode   = $goal->getCurrentGoalCode();
+        $mayPickMayorGoals = $currentGoalCode === null || $goal->isCurrentGoalComplete();
+
+        if ($mayPickMayorGoals && $character->isEmployed() && $character->getEmploymentJobCode() === 'mayor') {
+            if (array_key_exists('leader.lead_settlement', $catalog->lifeGoals())) {
+                return 'leader.lead_settlement';
+            }
+        }
+
+        return $goal->getLifeGoalCode();
     }
 
     private function broadcastRadiusAllowsEvent(Character $character, CharacterEvent $event): bool

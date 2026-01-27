@@ -12,6 +12,8 @@ use App\Entity\World;
 use App\Entity\WorldMapTile;
 use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
+use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
+use App\Game\Application\Settlement\SettlementProjectLifecycleService;
 use App\Game\Application\Tournament\TournamentLifecycleService;
 use App\Game\Domain\Economy\EconomyCatalog;
 use App\Game\Domain\Map\TileCoord;
@@ -21,6 +23,8 @@ use App\Game\Domain\Training\TrainingContext;
 use App\Repository\CharacterEventRepository;
 use App\Repository\CharacterGoalRepository;
 use App\Repository\NpcProfileRepository;
+use App\Repository\SettlementBuildingRepository;
+use App\Repository\SettlementProjectRepository;
 use App\Repository\SettlementRepository;
 use App\Repository\WorldMapTileRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -34,6 +38,10 @@ final class StartLongActionHandler
         private readonly ?SettlementRepository            $settlements = null,
         private readonly ?EconomyCatalogProviderInterface $economyCatalogProvider = null,
         private readonly ?TournamentLifecycleService      $tournamentLifecycle = null,
+        private readonly ?SettlementProjectRepository       $settlementProjects = null,
+        private readonly ?SettlementBuildingRepository      $settlementBuildings = null,
+        private readonly ?SettlementProjectLifecycleService $settlementProjectLifecycle = null,
+        private readonly ?ProjectCatalogProviderInterface   $projectCatalogProvider = null,
     )
     {
     }
@@ -129,11 +137,25 @@ final class StartLongActionHandler
 
             $multiplier = null;
             if ($type === LongActionType::Train) {
-                $multiplier = $trainingContext->multiplier();
+                if ($trainingContext === TrainingContext::Dojo) {
+                    [$settlementBuildingsByCoord, , $dojoTrainingMultipliersByCoord] = $this->settlementProjectContext(
+                        dojoCoords: $dojoCoords,
+                        settlements: $settlementEntities,
+                    );
+                    $coordKey   = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
+                    $multiplier = $dojoTrainingMultipliersByCoord[$coordKey] ?? $trainingContext->multiplier();
+                } else {
+                    $multiplier = $trainingContext->multiplier();
+                }
             }
 
             for ($i = 0; $i < $days; $i++) {
                 $events = $eventRepo->findByWorldUpToDay($world, $world->getCurrentDay());
+
+                [$settlementBuildingsByCoord, $activeSettlementProjectsByCoord, $dojoTrainingMultipliersByCoord] = $this->settlementProjectContext(
+                    dojoCoords: $dojoCoords,
+                    settlements: $settlementEntities,
+                );
 
                 $emitted = $this->clock->advanceDaysForLongAction(
                     world: $world,
@@ -150,6 +172,9 @@ final class StartLongActionHandler
                     goalCatalog: $catalog,
                     settlements: $settlementEntities,
                     economyCatalog: $economyCatalog,
+                    settlementBuildingsByCoord: $settlementBuildingsByCoord,
+                    activeSettlementProjectsByCoord: $activeSettlementProjectsByCoord,
+                    dojoTrainingMultipliersByCoord: $dojoTrainingMultipliersByCoord,
                 );
 
                 foreach ($emitted as $event) {
@@ -174,6 +199,27 @@ final class StartLongActionHandler
                     );
 
                     foreach ($tournamentEvents as $event) {
+                        $this->entityManager->persist($event);
+                    }
+
+                    $this->entityManager->flush();
+                }
+
+                if (
+                    $this->settlementProjectLifecycle instanceof SettlementProjectLifecycleService
+                    && $economyCatalog instanceof EconomyCatalog
+                    && $settlementEntities !== []
+                ) {
+                    $projectEvents = $this->settlementProjectLifecycle->advanceDay(
+                        world: $world,
+                        worldDay: $world->getCurrentDay(),
+                        settlements: $settlementEntities,
+                        emittedEvents: $emitted,
+                        characters: $characters,
+                        economyCatalog: $economyCatalog,
+                    );
+
+                    foreach ($projectEvents as $event) {
                         $this->entityManager->persist($event);
                     }
 
@@ -255,6 +301,66 @@ final class StartLongActionHandler
         $n = $this->hashInt(sprintf('%s:settlement:prosperity:%d:%d', $worldSeed, $x, $y));
 
         return 25 + ($n % 51); // 25..75
+    }
+
+    /**
+     * @param list<TileCoord>  $dojoCoords
+     * @param list<Settlement> $settlements
+     *
+     * @return array{
+     *   0:array<string,array<string,int>>,
+     *   1:array<string,array{building_code:string,target_level:int}>,
+     *   2:array<string,float>
+     * }
+     */
+    private function settlementProjectContext(array $dojoCoords, array $settlements): array
+    {
+        if (!$this->settlementProjects instanceof SettlementProjectRepository || !$this->settlementBuildings instanceof SettlementBuildingRepository) {
+            return [[], [], []];
+        }
+        if ($settlements === []) {
+            return [[], [], []];
+        }
+
+        $dojoIndex = [];
+        foreach ($dojoCoords as $coord) {
+            $dojoIndex[sprintf('%d:%d', $coord->x, $coord->y)] = true;
+        }
+
+        $buildingsByCoord = [];
+        $projectsByCoord  = [];
+
+        foreach ($settlements as $settlement) {
+            $key = sprintf('%d:%d', $settlement->getX(), $settlement->getY());
+
+            $dojo = $this->settlementBuildings->findOneBySettlementAndCode($settlement, 'dojo');
+            if ($dojo !== null) {
+                $buildingsByCoord[$key]['dojo'] = $dojo->getLevel();
+            } elseif (isset($dojoIndex[$key])) {
+                $buildingsByCoord[$key]['dojo'] = 1;
+            }
+
+            $active = $this->settlementProjects->findActiveForSettlement($settlement);
+            if ($active !== null) {
+                $projectsByCoord[$key] = [
+                    'building_code' => $active->getBuildingCode(),
+                    'target_level'  => $active->getTargetLevel(),
+                ];
+            }
+        }
+
+        $dojoTrainingMultipliersByCoord = [];
+        if ($this->projectCatalogProvider instanceof ProjectCatalogProviderInterface) {
+            $catalog = $this->projectCatalogProvider->get();
+            foreach ($buildingsByCoord as $coordKey => $levels) {
+                $level = $levels['dojo'] ?? 0;
+                if (is_int($level) && $level > 0) {
+                    $dojoTrainingMultipliersByCoord[$coordKey] = $catalog->dojoTrainingMultiplier($level);
+                }
+            }
+        }
+
+        return [$buildingsByCoord, $projectsByCoord, $dojoTrainingMultipliersByCoord];
     }
 
     private function hashInt(string $input): int

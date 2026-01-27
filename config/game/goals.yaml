@@ -39,6 +39,15 @@ life_goals:
                 weight: 1
             -   code: goal.find_job
                 weight: 1
+    leader.lead_settlement:
+        label: Lead a settlement
+        current_goal_pool:
+            -   code: goal.start_dojo_project
+                weight: 2
+            -   code: goal.organize_tournament
+                weight: 1
+            -   code: goal.earn_money
+                weight: 1
 
 current_goals:
     goal.earn_money:
@@ -79,6 +88,11 @@ current_goals:
         interruptible: true
         work_focus_target: 80
         handler: App\Game\Domain\Goal\Handlers\FindJobGoalHandler
+    goal.start_dojo_project:
+        label: Start dojo project
+        interruptible: true
+        work_focus_target: 0
+        handler: App\Game\Domain\Goal\Handlers\StartDojoProjectGoalHandler
 
 npc_life_goals:
     civilian:

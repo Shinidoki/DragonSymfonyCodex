@@ -29,6 +29,9 @@ services:
     App\Game\Application\Economy\EconomyCatalogProviderInterface:
         alias: App\Game\Application\Economy\EconomyCatalogProvider
 
+    App\Game\Application\Settlement\ProjectCatalogProviderInterface:
+        alias: App\Game\Application\Settlement\YamlProjectCatalogProvider
+
     App\Game\Domain\Goal\GoalPlanner:
         arguments:
             $handlers: !tagged_iterator app.current_goal_handler

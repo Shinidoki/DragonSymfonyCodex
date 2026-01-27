@@ -13,6 +13,68 @@ use PHPUnit\Framework\TestCase;
 
 final class CharacterGoalResolverTest extends TestCase
 {
+    public function testMayorUsesLeaderGoalPoolForCurrentGoalSelection(): void
+    {
+        $world     = new World('seed-1');
+        $character = new Character($world, 'NPC-0001', Race::Human);
+        $character->setEmployment('mayor', 0, 0);
+
+        $goal = new CharacterGoal($character);
+        $goal->setLifeGoalCode('fighter.become_strongest');
+        $goal->setCurrentGoalCode('goal.train_in_dojo');
+        $goal->setCurrentGoalComplete(true);
+
+        $catalog = new GoalCatalog(
+            lifeGoals: [
+                'fighter.become_strongest' => ['current_goal_pool' => [['code' => 'goal.train_in_dojo', 'weight' => 1]]],
+                'leader.lead_settlement'   => ['current_goal_pool' => [['code' => 'goal.start_dojo_project', 'weight' => 1]]],
+            ],
+            currentGoals: [
+                'goal.train_in_dojo'      => ['interruptible' => false, 'defaults' => []],
+                'goal.start_dojo_project' => ['interruptible' => true, 'defaults' => []],
+            ],
+            npcLifeGoals: [],
+            eventRules: [],
+        );
+
+        $resolver = new CharacterGoalResolver();
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: []);
+
+        self::assertSame('goal.start_dojo_project', $goal->getCurrentGoalCode());
+        self::assertFalse($goal->isCurrentGoalComplete());
+    }
+
+    public function testMayorDoesNotInvalidateInProgressNonLeaderGoal(): void
+    {
+        $world     = new World('seed-1');
+        $character = new Character($world, 'NPC-0001', Race::Human);
+        $character->setEmployment('mayor', 0, 0);
+
+        $goal = new CharacterGoal($character);
+        $goal->setLifeGoalCode('fighter.become_strongest');
+        $goal->setCurrentGoalCode('goal.participate_tournament');
+        $goal->setCurrentGoalComplete(false);
+
+        $catalog = new GoalCatalog(
+            lifeGoals: [
+                'fighter.become_strongest' => ['current_goal_pool' => [['code' => 'goal.participate_tournament', 'weight' => 1]]],
+                'leader.lead_settlement'   => ['current_goal_pool' => [['code' => 'goal.start_dojo_project', 'weight' => 1]]],
+            ],
+            currentGoals: [
+                'goal.participate_tournament' => ['interruptible' => false, 'defaults' => []],
+                'goal.start_dojo_project'     => ['interruptible' => true, 'defaults' => []],
+            ],
+            npcLifeGoals: [],
+            eventRules: [],
+        );
+
+        $resolver = new CharacterGoalResolver();
+        $resolver->resolveForDay($character, $goal, $catalog, worldDay: 1, events: []);
+
+        self::assertSame('goal.participate_tournament', $goal->getCurrentGoalCode());
+        self::assertFalse($goal->isCurrentGoalComplete());
+    }
+
     public function testIgnoresEventsFromTheSameDay(): void
     {
         $world     = new World('seed-1');

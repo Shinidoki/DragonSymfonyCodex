@@ -1,0 +1,23 @@
+# Settlement projects/buildings catalog (v1)
+
+buildings:
+    dojo:
+        levels:
+            1:
+                materials_cost: 800
+                base_required_work_units: 150
+                target_duration_days: 3
+                diversion_fraction: 0.30
+                training_multiplier: 1.2
+            2:
+                materials_cost: 1400
+                base_required_work_units: 300
+                target_duration_days: 4
+                diversion_fraction: 0.30
+                training_multiplier: 1.35
+            3:
+                materials_cost: 2300
+                base_required_work_units: 550
+                target_duration_days: 5
+                diversion_fraction: 0.30
+                training_multiplier: 1.5

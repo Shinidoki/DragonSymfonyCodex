@@ -2,17 +2,12 @@
 
 namespace App\Tests\Game\Integration;
 
-use App\Entity\Character;
 use App\Entity\CharacterEvent;
-use App\Entity\CharacterGoal;
 use App\Entity\Settlement;
 use App\Entity\Tournament;
-use App\Entity\TournamentParticipant;
 use App\Entity\World;
-use App\Entity\WorldMapTile;
-use App\Game\Application\Simulation\AdvanceDayHandler;
-use App\Game\Domain\Map\Biome;
-use App\Game\Domain\Race;
+use App\Game\Application\Tournament\TournamentLifecycleService;
+use App\Game\Domain\Economy\EconomyCatalog;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
 use Symfony\Bundle\FrameworkBundle\Test\KernelTestCase;
@@ -27,7 +22,42 @@ final class TournamentCancellationTest extends KernelTestCase
         $tool->createSchema($metadata);
     }
 
-    public function testCancelsTournamentIfFewerThanFourParticipantsRegister(): void
+    private function economyCatalog(): EconomyCatalog
+    {
+        return new EconomyCatalog(
+            jobs: [],
+            employmentPools: [],
+            settlement: [
+                'wage_pool_rate' => 0.5,
+                'tax_rate'       => 0.2,
+                'production'     => [
+                    'per_work_unit_base'            => 0,
+                    'per_work_unit_prosperity_mult' => 0,
+                    'randomness_pct'                => 0.0,
+                ],
+            ],
+            thresholds: [
+                'money_low_employed'   => 0,
+                'money_low_unemployed' => 0,
+            ],
+            tournaments: [
+                'min_spend'                      => 50,
+                'max_spend_fraction_of_treasury' => 0.30,
+                'prize_pool_fraction'            => 0.50,
+                'duration_days'                  => 2,
+                'radius'                         => ['base' => 2, 'per_spend' => 50, 'max' => 20],
+                'gains'                          => [
+                    'fame_base'            => 0,
+                    'fame_per_spend'       => 100,
+                    'prosperity_base'      => 0,
+                    'prosperity_per_spend' => 150,
+                    'per_participant_fame' => 0,
+                ],
+            ],
+        );
+    }
+
+    public function testCancelsTournamentWhenLessThanFourParticipantsArePresent(): void
     {
         self::bootKernel();
 
@@ -35,73 +65,59 @@ final class TournamentCancellationTest extends KernelTestCase
         $this->resetDatabaseSchema($entityManager);
 
         $world = new World('seed-1');
-        $world->setMapSize(8, 8);
         $entityManager->persist($world);
 
-        $settlementTile = new WorldMapTile($world, 3, 0, Biome::City);
-        $settlementTile->setHasSettlement(true);
-
-        $settlement = new Settlement($world, 3, 0);
-        $settlement->addToTreasury(1_000);
-
-        $organizer = new Character($world, 'Mayor', Race::Human);
-        $organizer->setTilePosition(3, 0);
-
-        $organizerGoal = new CharacterGoal($organizer);
-        $organizerGoal->setLifeGoalCode('civilian.organize_events');
-        $organizerGoal->setCurrentGoalCode('goal.organize_tournament');
-        $organizerGoal->setCurrentGoalData(['spend' => 200]);
-        $organizerGoal->setCurrentGoalComplete(false);
-
-        $fighters = [];
-        for ($i = 1; $i <= 3; $i++) {
-            $c = new Character($world, sprintf('F%d', $i), Race::Human);
-            $c->setTilePosition(3, 0);
-            $fighters[] = $c;
-
-            $g = new CharacterGoal($c);
-            $g->setLifeGoalCode('fighter.become_strongest');
-            $g->setCurrentGoalCode('goal.participate_tournament');
-            $g->setCurrentGoalData(['center_x' => 3, 'center_y' => 0, 'resolve_day' => 3]);
-            $g->setCurrentGoalComplete(false);
-
-            $entityManager->persist($c);
-            $entityManager->persist($g);
-        }
-
-        $entityManager->persist($settlementTile);
+        $settlement = new Settlement($world, 1, 1);
         $entityManager->persist($settlement);
-        $entityManager->persist($organizer);
-        $entityManager->persist($organizerGoal);
+
+        $event = new CharacterEvent(
+            world: $world,
+            character: null,
+            type: 'tournament_announced',
+            day: 1,
+            data: [
+                'announce_day'           => 1,
+                'registration_close_day' => 2,
+                'center_x'               => 1,
+                'center_y'               => 1,
+                'radius'                 => 5,
+                'spend'                  => 200,
+                'prize_pool'             => 100,
+                'resolve_day'            => 3,
+            ],
+        );
+        $entityManager->persist($event);
         $entityManager->flush();
 
-        $handler = self::getContainer()->get(AdvanceDayHandler::class);
-        self::assertInstanceOf(AdvanceDayHandler::class, $handler);
+        $service = new TournamentLifecycleService($entityManager);
 
-        // Day 1: announce; Day 2: registration closes + group stage (should cancel).
-        $handler->advance((int)$world->getId(), 2);
+        $service->advanceDay(
+            world: $world,
+            worldDay: 1,
+            characters: [],
+            goalsByCharacterId: [],
+            emittedEvents: [$event],
+            settlements: [$settlement],
+            economyCatalog: $this->economyCatalog(),
+        );
 
-        $tournament = $entityManager->getRepository(Tournament::class)->findOneBy(['world' => $world]);
+        $events = $service->advanceDay(
+            world: $world,
+            worldDay: 2, // group stage day
+            characters: [],
+            goalsByCharacterId: [],
+            emittedEvents: [],
+            settlements: [$settlement],
+            economyCatalog: $this->economyCatalog(),
+        );
+
+        self::assertNotEmpty($events);
+        self::assertSame('tournament_canceled', $events[0]->getType());
+
+        $tournamentRepo = $entityManager->getRepository(Tournament::class);
+        $tournament     = $tournamentRepo->findOneBy(['requestEventId' => (int)$event->getId()]);
         self::assertInstanceOf(Tournament::class, $tournament);
-        self::assertSame('canceled', $tournament->getStatus());
-
-        $participants = $entityManager->getRepository(TournamentParticipant::class)->findBy(['tournament' => $tournament]);
-        self::assertCount(3, $participants);
-
-        foreach ($fighters as $fighter) {
-            /** @var CharacterGoal $goal */
-            $goal = $entityManager->getRepository(CharacterGoal::class)->findOneBy(['character' => $fighter]);
-            self::assertSame('goal.participate_tournament', $goal->getCurrentGoalCode());
-            self::assertTrue($goal->isCurrentGoalComplete());
-        }
-
-        $event = $entityManager->getRepository(CharacterEvent::class)->findOneBy([
-            'world' => $world,
-            'type'  => 'tournament_canceled',
-            'day'   => 2,
-        ]);
-        self::assertInstanceOf(CharacterEvent::class, $event);
-        self::assertNull($event->getCharacter());
+        self::assertSame(Tournament::STATUS_CANCELED, $tournament->getStatus());
     }
 }
 

@@ -1,0 +1,9 @@
+buildings:
+    market:
+        levels:
+            1:
+                materials_cost: 100
+                base_required_work_units: 10
+                target_duration_days: 2
+                diversion_fraction: 0.25
+                training_multiplier: 1.0
