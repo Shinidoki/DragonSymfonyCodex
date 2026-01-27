@@ -112,7 +112,7 @@ final class DojoMasteryLifecycleTest extends KernelTestCase
         $entityManager->persist($challengeEvent);
         $entityManager->flush();
 
-        $service->advanceDay(
+        $events = $service->advanceDay(
             $world,
             worldDay: 1,
             settlements: [$settlement],
@@ -120,6 +120,9 @@ final class DojoMasteryLifecycleTest extends KernelTestCase
             emittedEvents: [$challengeEvent],
         );
         $entityManager->flush();
+
+        $types = array_map(static fn(CharacterEvent $e): string => $e->getType(), $events);
+        self::assertContains('sim_fight_resolved', $types);
 
         $entityManager->refresh($dojo);
         self::assertSame((int)$challenger->getId(), (int)$dojo->getMasterCharacter()?->getId());

@@ -186,6 +186,23 @@ final class DojoLifecycleService
                 );
 
                 $winner = $result->winnerCharacterId === (int)$challengerId ? $challenger : $master;
+
+                $events[] = new CharacterEvent(
+                    world: $world,
+                    character: null,
+                    type: 'sim_fight_resolved',
+                    day: $worldDay,
+                    data: [
+                        'context'       => 'dojo_challenge',
+                        'settlement_x'  => $x,
+                        'settlement_y'  => $y,
+                        'challenger_id' => (int)$challengerId,
+                        'master_id'     => (int)$masterId,
+                        'winner_id'     => (int)$winner->getId(),
+                        'actions'       => $result->actions,
+                    ],
+                );
+
                 if ($winner === $challenger) {
                     $dojo->setMasterCharacter($challenger);
                 }

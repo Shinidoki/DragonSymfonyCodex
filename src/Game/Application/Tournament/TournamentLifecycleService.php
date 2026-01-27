@@ -277,6 +277,7 @@ final class TournamentLifecycleService
         });
 
         [$techniquesByCharacterId, $transformationsByCharacterId] = $this->loadCombatKnowledge($present);
+        $fightEvents        = [];
 
         $groupSize = 4;
         $groups    = array_chunk($present, $groupSize);
@@ -295,7 +296,7 @@ final class TournamentLifecycleService
                 for ($j = $i + 1; $j < $n; $j++) {
                     $a                             = $group[$i];
                     $b                             = $group[$j];
-                    $winner = $this->pickWinner($tournament, 'group:' . $groupIndex, $matchIndex, $a, $b, $techniquesByCharacterId, $transformationsByCharacterId);
+                    $winner = $this->pickWinner($tournament, $worldDay, 'group:' . $groupIndex, $matchIndex, $a, $b, $techniquesByCharacterId, $transformationsByCharacterId, $fightEvents);
                     $points[(int)$winner->getId()] += 3;
                     $matchIndex++;
                 }
@@ -368,7 +369,7 @@ final class TournamentLifecycleService
             }
         }
 
-        return [];
+        return $fightEvents;
     }
 
     /**
@@ -463,6 +464,7 @@ final class TournamentLifecycleService
         }
 
         [$techniquesByCharacterId, $transformationsByCharacterId] = $this->loadCombatKnowledge($seeded);
+        $fightEvents = [];
 
         usort($seeded, fn(Character $a, Character $b): int => ((int)$a->getId()) <=> ((int)$b->getId()));
 
@@ -494,7 +496,7 @@ final class TournamentLifecycleService
                 $a = $round[$i];
                 $b = $round[$n - 1 - $i];
 
-                $winner = $this->pickWinner($tournament, $stage, $matchIndex, $a, $b, $techniquesByCharacterId, $transformationsByCharacterId);
+                $winner = $this->pickWinner($tournament, $worldDay, $stage, $matchIndex, $a, $b, $techniquesByCharacterId, $transformationsByCharacterId, $fightEvents);
                 $loser  = $winner === $a ? $b : $a;
 
                 if ($n === 4) {
@@ -510,13 +512,13 @@ final class TournamentLifecycleService
 
         $finalA = $round[0];
         $finalB = $round[1];
-        $champ = $this->pickWinner($tournament, 'final', $matchIndex, $finalA, $finalB, $techniquesByCharacterId, $transformationsByCharacterId);
+        $champ       = $this->pickWinner($tournament, $worldDay, 'final', $matchIndex, $finalA, $finalB, $techniquesByCharacterId, $transformationsByCharacterId, $fightEvents);
         $runner = $champ === $finalA ? $finalB : $finalA;
 
         $third = null;
         if (count($semiLosers) === 2) {
             $matchIndex++;
-            $third = $this->pickWinner($tournament, 'third_place', $matchIndex, $semiLosers[0], $semiLosers[1], $techniquesByCharacterId, $transformationsByCharacterId);
+            $third = $this->pickWinner($tournament, $worldDay, 'third_place', $matchIndex, $semiLosers[0], $semiLosers[1], $techniquesByCharacterId, $transformationsByCharacterId, $fightEvents);
         }
 
         $prizePool = $tournament->getPrizePool();
@@ -592,21 +594,24 @@ final class TournamentLifecycleService
             ],
         );
 
-        return [$event];
+        return array_merge([$event], $fightEvents);
     }
 
     /**
      * @param array<int,list<CharacterTechnique>>      $techniquesByCharacterId
      * @param array<int,list<CharacterTransformation>> $transformationsByCharacterId
+     * @param list<CharacterEvent> $fightEvents
      */
     private function pickWinner(
         Tournament $tournament,
+        int   $worldDay,
         string     $stage,
         int        $matchIndex,
         Character  $a,
         Character  $b,
         array      $techniquesByCharacterId,
         array      $transformationsByCharacterId,
+        array &$fightEvents,
     ): Character
     {
         $aid = $a->getId();
@@ -629,6 +634,25 @@ final class TournamentLifecycleService
                 new SimulatedCombatant($b, teamId: (int)$bid, techniques: $bTech, transformations: $bTrans),
             ],
             rules: new CombatRules(allowFriendlyFire: true),
+        );
+
+        $fightEvents[] = new CharacterEvent(
+            world: $tournament->getWorld(),
+            character: null,
+            type: 'sim_fight_resolved',
+            day: $worldDay,
+            data: [
+                'context'       => 'tournament',
+                'tournament_id' => $tournament->getId(),
+                'center_x'      => $tournament->getSettlement()->getX(),
+                'center_y'      => $tournament->getSettlement()->getY(),
+                'stage'         => $stage,
+                'match_index'   => $matchIndex,
+                'a_id'          => (int)$aid,
+                'b_id'          => (int)$bid,
+                'winner_id'     => $result->winnerCharacterId,
+                'actions'       => $result->actions,
+            ],
         );
 
         return $result->winnerCharacterId === (int)$aid ? $a : $b;
