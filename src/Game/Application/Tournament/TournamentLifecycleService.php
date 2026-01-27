@@ -5,16 +5,24 @@ namespace App\Game\Application\Tournament;
 use App\Entity\Character;
 use App\Entity\CharacterEvent;
 use App\Entity\CharacterGoal;
+use App\Entity\CharacterTechnique;
+use App\Entity\CharacterTransformation;
 use App\Entity\Settlement;
 use App\Entity\Tournament;
 use App\Entity\TournamentParticipant;
 use App\Entity\World;
+use App\Game\Domain\Combat\SimulatedCombat\CombatRules;
+use App\Game\Domain\Combat\SimulatedCombat\SimulatedCombatant;
+use App\Game\Domain\Combat\SimulatedCombat\SimulatedCombatResolver;
 use App\Game\Domain\Economy\EconomyCatalog;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class TournamentLifecycleService
 {
-    public function __construct(private readonly EntityManagerInterface $entityManager)
+    public function __construct(
+        private readonly EntityManagerInterface   $entityManager,
+        private readonly ?SimulatedCombatResolver $combatResolver = null,
+    )
     {
     }
 
@@ -268,6 +276,8 @@ final class TournamentLifecycleService
             return ((int)$a->getId()) <=> ((int)$b->getId());
         });
 
+        [$techniquesByCharacterId, $transformationsByCharacterId] = $this->loadCombatKnowledge($present);
+
         $groupSize = 4;
         $groups    = array_chunk($present, $groupSize);
 
@@ -285,7 +295,7 @@ final class TournamentLifecycleService
                 for ($j = $i + 1; $j < $n; $j++) {
                     $a                             = $group[$i];
                     $b                             = $group[$j];
-                    $winner                        = $this->pickWinner($tournament, 'group:' . $groupIndex, $matchIndex, $a, $b);
+                    $winner = $this->pickWinner($tournament, 'group:' . $groupIndex, $matchIndex, $a, $b, $techniquesByCharacterId, $transformationsByCharacterId);
                     $points[(int)$winner->getId()] += 3;
                     $matchIndex++;
                 }
@@ -452,6 +462,8 @@ final class TournamentLifecycleService
             return [];
         }
 
+        [$techniquesByCharacterId, $transformationsByCharacterId] = $this->loadCombatKnowledge($seeded);
+
         usort($seeded, fn(Character $a, Character $b): int => ((int)$a->getId()) <=> ((int)$b->getId()));
 
         // Re-order by seed to create the initial bracket order.
@@ -482,7 +494,7 @@ final class TournamentLifecycleService
                 $a = $round[$i];
                 $b = $round[$n - 1 - $i];
 
-                $winner = $this->pickWinner($tournament, $stage, $matchIndex, $a, $b);
+                $winner = $this->pickWinner($tournament, $stage, $matchIndex, $a, $b, $techniquesByCharacterId, $transformationsByCharacterId);
                 $loser  = $winner === $a ? $b : $a;
 
                 if ($n === 4) {
@@ -498,13 +510,13 @@ final class TournamentLifecycleService
 
         $finalA = $round[0];
         $finalB = $round[1];
-        $champ  = $this->pickWinner($tournament, 'final', $matchIndex, $finalA, $finalB);
+        $champ = $this->pickWinner($tournament, 'final', $matchIndex, $finalA, $finalB, $techniquesByCharacterId, $transformationsByCharacterId);
         $runner = $champ === $finalA ? $finalB : $finalA;
 
         $third = null;
         if (count($semiLosers) === 2) {
             $matchIndex++;
-            $third = $this->pickWinner($tournament, 'third_place', $matchIndex, $semiLosers[0], $semiLosers[1]);
+            $third = $this->pickWinner($tournament, 'third_place', $matchIndex, $semiLosers[0], $semiLosers[1], $techniquesByCharacterId, $transformationsByCharacterId);
         }
 
         $prizePool = $tournament->getPrizePool();
@@ -583,6 +595,45 @@ final class TournamentLifecycleService
         return [$event];
     }
 
+    /**
+     * @param array<int,list<CharacterTechnique>>      $techniquesByCharacterId
+     * @param array<int,list<CharacterTransformation>> $transformationsByCharacterId
+     */
+    private function pickWinner(
+        Tournament $tournament,
+        string     $stage,
+        int        $matchIndex,
+        Character  $a,
+        Character  $b,
+        array      $techniquesByCharacterId,
+        array      $transformationsByCharacterId,
+    ): Character
+    {
+        $aid = $a->getId();
+        $bid = $b->getId();
+        if ($aid === null || $bid === null) {
+            return $a;
+        }
+
+        // Ensure both participants have stable in-memory technique/transformation knowledge for this fight.
+        $aTech  = $techniquesByCharacterId[(int)$aid] ?? [];
+        $bTech  = $techniquesByCharacterId[(int)$bid] ?? [];
+        $aTrans = $transformationsByCharacterId[(int)$aid] ?? [];
+        $bTrans = $transformationsByCharacterId[(int)$bid] ?? [];
+
+        $resolver = $this->combatResolver ?? new SimulatedCombatResolver();
+
+        $result = $resolver->resolve(
+            combatants: [
+                new SimulatedCombatant($a, teamId: (int)$aid, techniques: $aTech, transformations: $aTrans),
+                new SimulatedCombatant($b, teamId: (int)$bid, techniques: $bTech, transformations: $bTrans),
+            ],
+            rules: new CombatRules(allowFriendlyFire: true),
+        );
+
+        return $result->winnerCharacterId === (int)$aid ? $a : $b;
+    }
+
     private function power(Character $character): int
     {
         $a = $character->getCoreAttributes();
@@ -591,25 +642,39 @@ final class TournamentLifecycleService
             + $a->kiControl + $a->kiRecovery + $a->focus + $a->discipline + $a->adaptability;
     }
 
-    private function pickWinner(Tournament $tournament, string $stage, int $matchIndex, Character $a, Character $b): Character
+    /**
+     * @param list<Character> $characters
+     *
+     * @return array{0:array<int,list<CharacterTechnique>>,1:array<int,list<CharacterTransformation>>}
+     */
+    private function loadCombatKnowledge(array $characters): array
     {
-        $aid = $a->getId();
-        $bid = $b->getId();
-        if ($aid === null || $bid === null) {
-            return $a;
+        if ($characters === []) {
+            return [[], []];
         }
 
-        $pa = $this->power($a);
-        $pb = $this->power($b);
+        /** @var list<CharacterTechnique> $techniques */
+        $techniques = $this->entityManager->getRepository(CharacterTechnique::class)->findBy(['character' => $characters], ['id' => 'ASC']);
+        /** @var list<CharacterTransformation> $transformations */
+        $transformations = $this->entityManager->getRepository(CharacterTransformation::class)->findBy(['character' => $characters], ['id' => 'ASC']);
 
-        if ($pa === $pb) {
-            return (int)$aid <= (int)$bid ? $a : $b;
+        $techniquesByCharacterId = [];
+        foreach ($techniques as $k) {
+            $cid = $k->getCharacter()->getId();
+            if ($cid !== null) {
+                $techniquesByCharacterId[(int)$cid][] = $k;
+            }
         }
 
-        $total = max(1, $pa + $pb);
-        $roll  = ($this->hashInt(sprintf('t:%d:%s:%d:%d:%d', (int)$tournament->getId(), $stage, $matchIndex, (int)$aid, (int)$bid)) % $total) + 1;
+        $transformationsByCharacterId = [];
+        foreach ($transformations as $k) {
+            $cid = $k->getCharacter()->getId();
+            if ($cid !== null) {
+                $transformationsByCharacterId[(int)$cid][] = $k;
+            }
+        }
 
-        return $roll <= $pa ? $a : $b;
+        return [$techniquesByCharacterId, $transformationsByCharacterId];
     }
 
     private function powerOfTwoFloor(int $n): int
@@ -624,12 +689,5 @@ final class TournamentLifecycleService
         }
 
         return $p;
-    }
-
-    private function hashInt(string $input): int
-    {
-        $hash = hash('sha256', $input);
-
-        return (int)hexdec(substr($hash, 0, 8));
     }
 }

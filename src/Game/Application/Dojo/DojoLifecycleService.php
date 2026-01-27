@@ -4,11 +4,16 @@ namespace App\Game\Application\Dojo;
 
 use App\Entity\Character;
 use App\Entity\CharacterEvent;
+use App\Entity\CharacterTechnique;
+use App\Entity\CharacterTransformation;
 use App\Entity\Settlement;
 use App\Entity\SettlementBuilding;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
 use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
+use App\Game\Domain\Combat\SimulatedCombat\CombatRules;
+use App\Game\Domain\Combat\SimulatedCombat\SimulatedCombatant;
+use App\Game\Domain\Combat\SimulatedCombat\SimulatedCombatResolver;
 use App\Repository\SettlementBuildingRepository;
 use App\Repository\WorldMapTileRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -20,6 +25,7 @@ final class DojoLifecycleService
         private readonly SettlementBuildingRepository    $buildings,
         private readonly WorldMapTileRepository          $tiles,
         private readonly ProjectCatalogProviderInterface $projectCatalogProvider,
+        private readonly ?SimulatedCombatResolver $combatResolver = null,
     )
     {
     }
@@ -159,7 +165,27 @@ final class DojoLifecycleService
 
                 $dojo->setMasterLastChallengedDay($worldDay);
 
-                $winner = $this->pickWinner($challenger, $master);
+                /** @var list<CharacterTechnique> $challengerTech */
+                $challengerTech = $this->entityManager->getRepository(CharacterTechnique::class)->findBy(['character' => $challenger], ['id' => 'ASC']);
+                /** @var list<CharacterTechnique> $masterTech */
+                $masterTech = $this->entityManager->getRepository(CharacterTechnique::class)->findBy(['character' => $master], ['id' => 'ASC']);
+
+                /** @var list<CharacterTransformation> $challengerTrans */
+                $challengerTrans = $this->entityManager->getRepository(CharacterTransformation::class)->findBy(['character' => $challenger], ['id' => 'ASC']);
+                /** @var list<CharacterTransformation> $masterTrans */
+                $masterTrans = $this->entityManager->getRepository(CharacterTransformation::class)->findBy(['character' => $master], ['id' => 'ASC']);
+
+                $resolver = $this->combatResolver ?? new SimulatedCombatResolver();
+
+                $result = $resolver->resolve(
+                    combatants: [
+                        new SimulatedCombatant($challenger, teamId: (int)$challengerId, techniques: $challengerTech, transformations: $challengerTrans),
+                        new SimulatedCombatant($master, teamId: (int)$masterId, techniques: $masterTech, transformations: $masterTrans),
+                    ],
+                    rules: new CombatRules(allowFriendlyFire: true),
+                );
+
+                $winner = $result->winnerCharacterId === (int)$challengerId ? $challenger : $master;
                 if ($winner === $challenger) {
                     $dojo->setMasterCharacter($challenger);
                 }
@@ -199,31 +225,4 @@ final class DojoLifecycleService
 
         return $dojo;
     }
-
-    private function pickWinner(Character $challenger, Character $master): Character
-    {
-        $pc = $this->power($challenger);
-        $pm = $this->power($master);
-
-        if ($pc === $pm) {
-            $cid = $challenger->getId();
-            $mid = $master->getId();
-            if ($cid === null || $mid === null) {
-                return $challenger;
-            }
-
-            return (int)$cid <= (int)$mid ? $challenger : $master;
-        }
-
-        return $pc > $pm ? $challenger : $master;
-    }
-
-    private function power(Character $character): int
-    {
-        $a = $character->getCoreAttributes();
-
-        return $a->strength + $a->speed + $a->endurance + $a->durability + $a->kiCapacity
-            + $a->kiControl + $a->kiRecovery + $a->focus + $a->discipline + $a->adaptability;
-    }
 }
-
