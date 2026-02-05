@@ -17,6 +17,8 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class PopulateWorldHandler
 {
+    private const int MIN_POPULATION_PER_SETTLEMENT = 5;
+
     public function __construct(
         private readonly WorldRepository        $worldRepository,
         private readonly WorldMapTileRepository $tiles,
@@ -49,10 +51,19 @@ final class PopulateWorldHandler
 
         /** @var list<WorldMapTile> $settlements */
         $settlements = $this->tiles->findBy(['world' => $world, 'hasSettlement' => true]);
+        $this->pruneSettlementTilesForPopulation($world, $existing + $count, $settlements);
+
+        $settlements = array_values(array_filter(
+            $settlements,
+            static fn(WorldMapTile $tile): bool => $tile->hasSettlement(),
+        ));
         usort($settlements, static fn(WorldMapTile $a, WorldMapTile $b): int => [$a->getX(), $a->getY()] <=> [$b->getX(), $b->getY()]);
 
         /** @var list<WorldMapTile> $dojos */
-        $dojos = $this->tiles->findBy(['world' => $world, 'hasDojo' => true]);
+        $dojos = array_values(array_filter(
+            $settlements,
+            static fn(WorldMapTile $tile): bool => $tile->hasDojo(),
+        ));
 
         $economy = $this->economyCatalogProvider->get();
 
@@ -94,6 +105,72 @@ final class PopulateWorldHandler
         $this->entityManager->flush();
 
         return new PopulateWorldResult($world, $count, $createdByArchetype);
+    }
+
+    /**
+     * @param list<WorldMapTile> $settlementTiles
+     */
+    private function pruneSettlementTilesForPopulation(World $world, int $populationAfterPopulate, array $settlementTiles): void
+    {
+        if ($populationAfterPopulate <= 0) {
+            return;
+        }
+
+        $maxSettlements = max(1, intdiv($populationAfterPopulate, self::MIN_POPULATION_PER_SETTLEMENT));
+        if (count($settlementTiles) <= $maxSettlements) {
+            return;
+        }
+
+        $keepKeys = [];
+        $ranked   = [];
+
+        foreach ($settlementTiles as $tile) {
+            $x = $tile->getX();
+            $y = $tile->getY();
+            $k = sprintf('%d:%d', $x, $y);
+
+            if ($x === 0 && $y === 0) {
+                $keepKeys[$k] = true;
+                continue;
+            }
+
+            $ranked[] = [
+                'score' => $this->hashInt(sprintf('%s:settlement-rank:%d:%d', $world->getSeed(), $x, $y)),
+                'x'     => $x,
+                'y'     => $y,
+                'key'   => $k,
+            ];
+        }
+
+        usort($ranked, static function (array $a, array $b): int {
+            if ($a['score'] !== $b['score']) {
+                return $a['score'] <=> $b['score'];
+            }
+            if ($a['x'] !== $b['x']) {
+                return $a['x'] <=> $b['x'];
+            }
+
+            return $a['y'] <=> $b['y'];
+        });
+
+        $needed = $maxSettlements - count($keepKeys);
+        if ($needed < 0) {
+            $needed = 0;
+        }
+
+        for ($i = 0; $i < $needed && $i < count($ranked); $i++) {
+            $keepKeys[(string)$ranked[$i]['key']] = true;
+        }
+
+        foreach ($settlementTiles as $tile) {
+            $key = sprintf('%d:%d', $tile->getX(), $tile->getY());
+            if (isset($keepKeys[$key])) {
+                continue;
+            }
+
+            $tile->setHasSettlement(false);
+            $tile->setHasDojo(false);
+        }
     }
 
     private function pickRace(string $worldSeed, int $index): Race

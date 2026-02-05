@@ -2,6 +2,7 @@
 
 namespace App\Game\Application\Simulation;
 
+use App\Entity\Character;
 use App\Entity\Settlement;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
@@ -28,6 +29,9 @@ use Doctrine\ORM\EntityManagerInterface;
 
 final class AdvanceDayHandler
 {
+    private const int MIN_POPULATION_TO_KEEP_SETTLEMENT   = 5;
+    private const int MIN_WORLD_DAY_TO_ABANDON_SETTLEMENT = 3;
+
     public function __construct(
         private readonly WorldRepository        $worldRepository,
         private readonly CharacterRepository    $characterRepository,
@@ -214,6 +218,22 @@ final class AdvanceDayHandler
 
                     $this->entityManager->flush();
                 }
+
+                if ($this->abandonUnderpopulatedSettlements($world, $characters)) {
+                    $this->entityManager->flush();
+
+                    if ($this->settlements instanceof SettlementRepository && $this->economyCatalogProvider instanceof EconomyCatalogProviderInterface) {
+                        /** @var list<WorldMapTile> $settlementTiles */
+                        $settlementTiles    = $this->tiles->findBy(['world' => $world, 'hasSettlement' => true]);
+                        $settlementCoords   = array_map(
+                            static fn(WorldMapTile $tile): TileCoord => new TileCoord($tile->getX(), $tile->getY()),
+                            $settlementTiles,
+                        );
+                        $settlementEntities = $settlementTiles !== []
+                            ? $this->ensureSettlements($world, $settlementTiles)
+                            : [];
+                    }
+                }
             }
 
             return new AdvanceDayResult($world, $characters, $days);
@@ -235,7 +255,79 @@ final class AdvanceDayHandler
         );
         $this->entityManager->flush();
 
+        if ($this->abandonUnderpopulatedSettlements($world, $characters)) {
+            $this->entityManager->flush();
+        }
+
         return new AdvanceDayResult($world, $characters, $days);
+    }
+
+    /**
+     * @param list<Character> $characters
+     */
+    private function abandonUnderpopulatedSettlements(World $world, array $characters): bool
+    {
+        if (!$this->settlements instanceof SettlementRepository) {
+            return false;
+        }
+
+        if ($world->getCurrentDay() < self::MIN_WORLD_DAY_TO_ABANDON_SETTLEMENT) {
+            return false;
+        }
+
+        /** @var list<WorldMapTile> $settlementTiles */
+        $settlementTiles = $this->tiles->findBy(['world' => $world, 'hasSettlement' => true]);
+        if ($settlementTiles === []) {
+            return false;
+        }
+
+        $populationByCoord = [];
+        $employedByCoord   = [];
+
+        foreach ($characters as $character) {
+            $id           = $character->getId();
+            $characterKey = $id !== null ? 'id:' . (string)$id : 'obj:' . (string)spl_object_id($character);
+
+            $hereKey                                    = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
+            $populationByCoord[$hereKey][$characterKey] = true;
+
+            if ($character->isEmployed()) {
+                $ex                                         = (int)$character->getEmploymentSettlementX();
+                $ey                                         = (int)$character->getEmploymentSettlementY();
+                $workKey                                    = sprintf('%d:%d', $ex, $ey);
+                $populationByCoord[$workKey][$characterKey] = true;
+                $employedByCoord[$workKey][]                = $character;
+            }
+        }
+
+        $didAbandon = false;
+
+        foreach ($settlementTiles as $tile) {
+            $x = $tile->getX();
+            $y = $tile->getY();
+
+            // Keep an always-present "capital" anchor to avoid worlds collapsing to zero settlements.
+            if ($x === 0 && $y === 0) {
+                continue;
+            }
+
+            $key        = sprintf('%d:%d', $x, $y);
+            $population = isset($populationByCoord[$key]) ? count($populationByCoord[$key]) : 0;
+            if ($population >= self::MIN_POPULATION_TO_KEEP_SETTLEMENT) {
+                continue;
+            }
+
+            $tile->setHasSettlement(false);
+            $tile->setHasDojo(false);
+
+            foreach ($employedByCoord[$key] ?? [] as $employedCharacter) {
+                $employedCharacter->clearEmployment();
+            }
+
+            $didAbandon = true;
+        }
+
+        return $didAbandon;
     }
 
     /**

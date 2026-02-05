@@ -71,6 +71,9 @@ final class DojoLifecycleService
             $cooldownDays = 1;
         }
 
+        /** @var array<string,SettlementBuilding|null> $dojoBySettlementKey */
+        $dojoBySettlementKey = [];
+
         $events = [];
 
         foreach ($emittedEvents as $event) {
@@ -99,7 +102,7 @@ final class DojoLifecycleService
                     continue;
                 }
 
-                $dojo = $this->ensureDojoBuilding($world, $settlement, $x, $y);
+                $dojo = $this->ensureDojoBuilding($world, $settlement, $x, $y, $dojoBySettlementKey);
                 if (!$dojo instanceof SettlementBuilding || $dojo->getLevel() <= 0) {
                     continue;
                 }
@@ -133,7 +136,7 @@ final class DojoLifecycleService
                     continue;
                 }
 
-                $dojo = $this->ensureDojoBuilding($world, $settlement, $x, $y);
+                $dojo = $this->ensureDojoBuilding($world, $settlement, $x, $y, $dojoBySettlementKey);
                 if (!$dojo instanceof SettlementBuilding || $dojo->getLevel() <= 0) {
                     continue;
                 }
@@ -225,20 +228,33 @@ final class DojoLifecycleService
         return $events;
     }
 
-    private function ensureDojoBuilding(World $world, Settlement $settlement, int $x, int $y): ?SettlementBuilding
+    /**
+     * @param array<string,SettlementBuilding|null> $dojoBySettlementKey
+     */
+    private function ensureDojoBuilding(World $world, Settlement $settlement, int $x, int $y, array &$dojoBySettlementKey): ?SettlementBuilding
     {
+        $sid = $settlement->getId();
+        $key = $sid !== null ? sprintf('id:%d', (int)$sid) : sprintf('coord:%d:%d', $x, $y);
+        if (array_key_exists($key, $dojoBySettlementKey)) {
+            return $dojoBySettlementKey[$key];
+        }
+
         $dojo = $this->buildings->findOneBySettlementAndCode($settlement, 'dojo');
         if ($dojo instanceof SettlementBuilding) {
+            $dojoBySettlementKey[$key] = $dojo;
             return $dojo;
         }
 
         $tile = $this->tiles->findOneBy(['world' => $world, 'x' => $x, 'y' => $y]);
         if (!$tile instanceof WorldMapTile || !$tile->hasDojo()) {
+            $dojoBySettlementKey[$key] = null;
             return null;
         }
 
         $dojo = new SettlementBuilding($settlement, 'dojo', 1);
         $this->entityManager->persist($dojo);
+
+        $dojoBySettlementKey[$key] = $dojo;
 
         return $dojo;
     }
