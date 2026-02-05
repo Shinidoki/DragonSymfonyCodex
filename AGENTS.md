@@ -5,9 +5,10 @@
 - `src/`: PHP application code (`App\\`), e.g. controllers in `src/Controller/`, entities in `src/Entity/`.
 - `config/`: Symfony configuration (packages, routes, services).
 - `templates/`: Twig templates (base layout in `templates/base.html.twig`).
-- `assets/`: Frontend assets managed by Symfony Asset Mapper/ImportMap (Stimulus controllers under
-  `assets/controllers/`).
+- `assets/`: Frontend assets managed by Webpack Encore (entrypoint `assets/app.js`), with Stimulus controllers under
+  `assets/controllers/` and Turbo via Symfony UX.
 - `public/`: Web entrypoint (`public/index.php`).
+- `public/build/`: Webpack Encore build output (generated).
 - `migrations/`: Doctrine migration classes.
 - `tests/`: PHPUnit tests and bootstrap (`tests/bootstrap.php`).
 - `docs/`: Project/design notes.
@@ -16,16 +17,25 @@
 
 ## Build, Test, and Development Commands
 
-- `composer install`: Install PHP dependencies and run Symfony Flex auto-scripts (cache clear, assets install, importmap
-  install).
+- `composer install`: Install PHP dependencies and run Symfony Flex auto-scripts.
+- `npm install`: Install JS dependencies for Webpack Encore.
 - `php bin/console`: Symfony CLI; useful subcommands include:
     - `php bin/console cache:clear`: Clear cache for the current `APP_ENV`.
     - `php bin/console doctrine:migrations:migrate`: Apply migrations.
-    - `php bin/console importmap:install`: Install/update importmap-managed JS.
-    - `php bin/console asset-map:compile`: Build asset mapper output for production.
+- `npm run dev`: Build frontend assets (development).
+- `npm run dev-server`: Run the Encore dev server.
+- `npm run build`: Build frontend assets (production).
 - `php -S localhost:8000 -t public`: Simple local web server (or use Symfony CLI if you have it installed).
 - `docker compose up -d`: Start local Postgres (and Mailpit via `compose.override.yaml`); stop with
   `docker compose down`.
+
+## Frontend (Bootstrap + Turbo)
+
+- Bootstrap 5 is imported in `assets/app.js` and compiled by Webpack Encore.
+- Default UI theme is dark-mode via `data-bs-theme="dark"` on `<html>` in `templates/base.html.twig`.
+  To switch to light mode, change it to `data-bs-theme="light"` (or remove the attribute).
+- `config/packages/webpack_encore.yaml` adds `data-turbo-track="reload"` to Encore tags so Turbo reloads assets on
+  changes.
 
 ## Coding Style & Naming Conventions
 

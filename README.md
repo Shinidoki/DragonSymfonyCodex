@@ -7,14 +7,47 @@ advancement, and stat growth).
 
 - PHP 8.4+
 - Composer
+- Node.js + npm (for Webpack Encore assets)
 - A database configured via `DATABASE_URL` (default `.env` uses MariaDB/MySQL)
 
 ## Local setup
 
 ```bash
 composer install
+npm install
 php bin/console doctrine:migrations:migrate --no-interaction
 ```
+
+Build frontend assets:
+
+```bash
+npm run dev
+```
+
+Run a local server:
+
+```bash
+php -S localhost:8000 -t public
+```
+
+## Admin UI
+
+Create an admin user:
+
+```bash
+php bin/console app:user:create --username=admin --admin
+```
+
+Then visit:
+
+- `GET /login`
+- `GET /admin`
+
+## Frontend (Webpack Encore + Bootstrap)
+
+- Entry point: `assets/app.js` (imports Bootstrap CSS/JS and starts Stimulus/Turbo).
+- Twig includes Encore tags in `templates/base.html.twig`.
+- Default theme is dark mode via `data-bs-theme="dark"` on `<html>` (change to `light` if desired).
 
 Create a world:
 
@@ -94,12 +127,6 @@ php bin/console game:local:exit --session=1
 ```
 
 ## API (read-only)
-
-Run a local server:
-
-```bash
-php -S localhost:8000 -t public
-```
 
 Example endpoints:
 

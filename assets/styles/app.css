@@ -1,7 +1,8 @@
 /* Keep custom styling minimal: Bootstrap is the primary UI layer. */
 
 body {
-    background: #f8f9fa;
+    background: var(--bs-body-bg);
+    color: var(--bs-body-color);
 }
 
 code {
