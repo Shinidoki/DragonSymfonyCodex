@@ -1,0 +1,94 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_title %}World #{{ world.id }}{% endblock %}
+
+{% block admin_body %}
+    <div class="page-header">
+        <div>
+            <h1>World #{{ world.id }}</h1>
+            <div class="muted">
+                Seed: <strong>{{ world.seed }}</strong> · Planet: <strong>{{ world.planetName }}</strong> · Day:
+                <strong>{{ world.currentDay }}</strong> · Map: <strong>{{ world.width }}×{{ world.height }}</strong>
+            </div>
+        </div>
+        <div class="page-header__actions">
+            <a class="btn" href="{{ path('admin_world_index') }}">Back</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <h2>Advance simulation</h2>
+        {{ form_start(advanceForm, { action: path('admin_world_advance', { id: world.id }), method: 'POST' }) }}
+        <div class="form-row">
+            {{ form_row(advanceForm.days) }}
+            <button class="btn btn--primary" type="submit">Advance</button>
+        </div>
+        {{ form_end(advanceForm) }}
+    </section>
+
+    <section class="panel">
+        <h2>Characters</h2>
+        <table class="table">
+            <thead>
+            <tr>
+                {% set currentSort = sort|default('id') %}
+                {% set currentDir = dir|default('asc') %}
+                {% set flipDir = currentDir == 'asc' ? 'desc' : 'asc' %}
+
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'id', dir: currentSort == 'id' ? flipDir : 'asc' }) }}">ID</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'name', dir: currentSort == 'name' ? flipDir : 'asc' }) }}">Name</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'race', dir: currentSort == 'race' ? flipDir : 'asc' }) }}">Race</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'tileX', dir: currentSort == 'tileX' ? flipDir : 'asc' }) }}">X</a>
+                    /
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'tileY', dir: currentSort == 'tileY' ? flipDir : 'asc' }) }}">Y</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'money', dir: currentSort == 'money' ? flipDir : 'asc' }) }}">Money</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'powerlevel', dir: currentSort == 'powerlevel' ? flipDir : 'desc' }) }}">Powerlevel</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'job', dir: currentSort == 'job' ? flipDir : 'asc' }) }}">Job</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'archetype', dir: currentSort == 'archetype' ? flipDir : 'asc' }) }}">Archetype</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'strength', dir: currentSort == 'strength' ? flipDir : 'desc' }) }}">STR</a>
+                </th>
+                <th>
+                    <a href="{{ path('admin_world_show', { id: world.id, sort: 'kiControl', dir: currentSort == 'kiControl' ? flipDir : 'desc' }) }}">KI
+                        Control</a></th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for character in characters %}
+                <tr>
+                    <td><a href="{{ path('admin_character_show', { id: character.id }) }}">#{{ character.id }}</a></td>
+                    <td>{{ character.name }}</td>
+                    <td>{{ character.race.value }}</td>
+                    <td>({{ character.tileX }}, {{ character.tileY }})</td>
+                    <td>${{ character.money }}</td>
+                    <td>{{ powerLevels[character.id]|default(0) }}</td>
+                    <td>{{ jobLabels[character.id]|default('unemployed') }}</td>
+                    <td>{{ archetypes[character.id]|default('') }}</td>
+                    <td>{{ stat_tier_label(character.strength) }} ({{ character.strength }})</td>
+                    <td>{{ stat_tier_label(character.kiControl) }} ({{ character.kiControl }})</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="10" class="muted">No characters in this world yet.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

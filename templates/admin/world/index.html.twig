@@ -1,0 +1,52 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_title %}Worlds{% endblock %}
+
+{% block admin_body %}
+    <div class="page-header">
+        <h1>Worlds</h1>
+    </div>
+
+    <section class="panel">
+        <h2>Create world</h2>
+        {{ form_start(createForm, { action: path('admin_world_create'), method: 'POST' }) }}
+        <div class="form-row">
+            {{ form_row(createForm.seed) }}
+            <button class="btn btn--primary" type="submit">Create</button>
+        </div>
+        {{ form_end(createForm) }}
+    </section>
+
+    <section class="panel">
+        <h2>Existing worlds</h2>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Seed</th>
+                <th>Planet</th>
+                <th>Day</th>
+                <th>Created</th>
+                <th>Characters</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for world in worlds %}
+                <tr>
+                    <td><a href="{{ path('admin_world_show', { id: world.id }) }}">#{{ world.id }}</a></td>
+                    <td>{{ world.seed }}</td>
+                    <td>{{ world.planetName }}</td>
+                    <td>{{ world.currentDay }}</td>
+                    <td>{{ world.createdAt|date('Y-m-d H:i') }}</td>
+                    <td>{{ world.characters|length }}</td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="6" class="muted">No worlds yet.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}
+

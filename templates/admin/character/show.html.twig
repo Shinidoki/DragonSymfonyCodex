@@ -1,0 +1,124 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_title %}Character #{{ character.id }}{% endblock %}
+
+{% block admin_body %}
+    <div class="page-header">
+        <div>
+            <h1>Character #{{ character.id }} — {{ character.name }}</h1>
+            <div class="muted">
+                World:
+                <a href="{{ path('admin_world_show', { id: character.world.id }) }}">#{{ character.world.id }}</a>
+                · Race: <strong>{{ character.race.value }}</strong>
+                · Location: <strong>({{ character.tileX }}, {{ character.tileY }})</strong>
+            </div>
+        </div>
+        <div class="page-header__actions">
+            <a class="btn" href="{{ path('admin_world_show', { id: character.world.id }) }}">Back to world</a>
+        </div>
+    </div>
+
+    <section class="panel">
+        <h2>Overview</h2>
+        <table class="table table--kv">
+            <tbody>
+            <tr>
+                <th>Powerlevel</th>
+                <td>{{ powerLevel }}</td>
+            </tr>
+            <tr>
+                <th>Job</th>
+                <td>{{ jobLabel }}</td>
+            </tr>
+            <tr>
+                <th>Archetype</th>
+                <td>{{ archetype|default('') }}</td>
+            </tr>
+            <tr>
+                <th>Money</th>
+                <td>${{ character.money }}</td>
+            </tr>
+            <tr>
+                <th>Location</th>
+                <td>({{ character.tileX }}, {{ character.tileY }})</td>
+            </tr>
+            <tr>
+                <th>Strength</th>
+                <td>{{ stat_tier_label(character.strength) }} ({{ character.strength }})</td>
+            </tr>
+            <tr>
+                <th>Ki Control</th>
+                <td>{{ stat_tier_label(character.kiControl) }} ({{ character.kiControl }})</td>
+            </tr>
+            <tr>
+                <th>Ki Capacity</th>
+                <td>{{ character.kiCapacity }}</td>
+            </tr>
+            <tr>
+                <th>Ki Recovery</th>
+                <td>{{ character.kiRecovery }}</td>
+            </tr>
+            <tr>
+                <th>Speed</th>
+                <td>{{ character.speed }}</td>
+            </tr>
+            <tr>
+                <th>Endurance</th>
+                <td>{{ character.endurance }}</td>
+            </tr>
+            <tr>
+                <th>Durability</th>
+                <td>{{ character.durability }}</td>
+            </tr>
+            <tr>
+                <th>Focus</th>
+                <td>{{ character.focus }}</td>
+            </tr>
+            <tr>
+                <th>Discipline</th>
+                <td>{{ character.discipline }}</td>
+            </tr>
+            <tr>
+                <th>Adaptability</th>
+                <td>{{ character.adaptability }}</td>
+            </tr>
+            </tbody>
+        </table>
+    </section>
+
+    <section class="panel">
+        <h2>Event history</h2>
+        <table class="table">
+            <thead>
+            <tr>
+                <th>ID</th>
+                <th>Day</th>
+                <th>Type</th>
+                <th>Created</th>
+                <th>Data</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for event in eventHistory %}
+                <tr>
+                    <td>#{{ event.id }}</td>
+                    <td>{{ event.day }}</td>
+                    <td><code>{{ event.type }}</code></td>
+                    <td>{{ event.createdAt|date('Y-m-d H:i') }}</td>
+                    <td>
+                        {% if event.data is not empty %}
+                            <code>{{ event.data|json_encode }}</code>
+                        {% else %}
+                            <span class="muted">—</span>
+                        {% endif %}
+                    </td>
+                </tr>
+            {% else %}
+                <tr>
+                    <td colspan="5" class="muted">No events for this character yet.</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </section>
+{% endblock %}

@@ -1,0 +1,23 @@
+{% extends 'admin/layout.html.twig' %}
+
+{% block admin_title %}Dashboard{% endblock %}
+
+{% block admin_body %}
+    <h1>Dashboard</h1>
+
+    <div class="cards">
+        <div class="card">
+            <div class="card__label">Worlds</div>
+            <div class="card__value">{{ worldCount }}</div>
+            <div class="card__actions">
+                <a class="btn" href="{{ path('admin_world_index') }}">View worlds</a>
+            </div>
+        </div>
+
+        <div class="card">
+            <div class="card__label">Characters</div>
+            <div class="card__value">{{ characterCount }}</div>
+        </div>
+    </div>
+{% endblock %}
+

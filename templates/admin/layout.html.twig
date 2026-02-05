@@ -1,0 +1,28 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{% block admin_title %}Admin{% endblock %} | DragonSymfony{% endblock %}
+
+{% block body %}
+    <header class="topbar">
+        <nav class="topbar__nav">
+            <a class="topbar__brand" href="{{ path('admin_dashboard') }}">Dragon Admin</a>
+            <a class="topbar__link" href="{{ path('admin_world_index') }}">Worlds</a>
+            <span class="topbar__spacer"></span>
+            {% if app.user %}
+                <span class="topbar__user">{{ app.user.userIdentifier }}</span>
+                <a class="topbar__link" href="{{ logout_path() }}">Logout</a>
+            {% endif %}
+        </nav>
+    </header>
+
+    <main class="container">
+        {% for type, messages in app.flashes %}
+            {% for message in messages %}
+                <div class="flash flash--{{ type }}">{{ message }}</div>
+            {% endfor %}
+        {% endfor %}
+
+        {% block admin_body %}{% endblock %}
+    </main>
+{% endblock %}
+
