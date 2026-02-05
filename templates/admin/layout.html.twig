@@ -3,26 +3,54 @@
 {% block title %}{% block admin_title %}Admin{% endblock %} | DragonSymfony{% endblock %}
 
 {% block body %}
-    <header class="topbar">
-        <nav class="topbar__nav">
-            <a class="topbar__brand" href="{{ path('admin_dashboard') }}">Dragon Admin</a>
-            <a class="topbar__link" href="{{ path('admin_world_index') }}">Worlds</a>
-            <span class="topbar__spacer"></span>
-            {% if app.user %}
-                <span class="topbar__user">{{ app.user.userIdentifier }}</span>
-                <a class="topbar__link" href="{{ logout_path() }}">Logout</a>
-            {% endif %}
-        </nav>
-    </header>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="{{ path('admin_dashboard') }}">Dragon Admin</a>
+            <button class="navbar-toggler"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#adminNavbar"
+                    aria-controls="adminNavbar"
+                    aria-expanded="false"
+                    aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
 
-    <main class="container">
+            <div class="collapse navbar-collapse" id="adminNavbar">
+                <ul class="navbar-nav me-auto mb-2 mb-lg-0">
+                    <li class="nav-item">
+                        <a class="nav-link{% if app.request.attributes.get('_route') starts with 'admin_world' %} active{% endif %}"
+                           href="{{ path('admin_world_index') }}">
+                            Worlds
+                        </a>
+                    </li>
+                </ul>
+
+                {% if app.user %}
+                    <span class="navbar-text me-3">{{ app.user.userIdentifier }}</span>
+                    <a class="btn btn-outline-light btn-sm" href="{{ logout_path() }}">Logout</a>
+                {% endif %}
+            </div>
+        </div>
+    </nav>
+
+    <main class="container py-4">
         {% for type, messages in app.flashes %}
+            {% set alertType = type %}
+            {% if type == 'error' %}
+                {% set alertType = 'danger' %}
+            {% elseif type not in ['primary', 'secondary', 'success', 'danger', 'warning', 'info', 'light', 'dark'] %}
+                {% set alertType = 'secondary' %}
+            {% endif %}
+
             {% for message in messages %}
-                <div class="flash flash--{{ type }}">{{ message }}</div>
+                <div class="alert alert-{{ alertType }} alert-dismissible fade show" role="alert">
+                    {{ message }}
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+                </div>
             {% endfor %}
         {% endfor %}
 
         {% block admin_body %}{% endblock %}
     </main>
 {% endblock %}
-

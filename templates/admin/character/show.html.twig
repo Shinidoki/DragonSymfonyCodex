@@ -3,149 +3,185 @@
 {% block admin_title %}Character #{{ character.id }}{% endblock %}
 
 {% block admin_body %}
-    <div class="page-header">
+    <div class="d-flex justify-content-between align-items-start mb-4">
         <div>
-            <h1>Character #{{ character.id }} — {{ character.name }}</h1>
-            <div class="muted">
+            <h1 class="mb-1">Character #{{ character.id }} — {{ character.name }}</h1>
+            <div class="text-secondary">
                 World:
-                <a href="{{ path('admin_world_show', { id: character.world.id }) }}">#{{ character.world.id }}</a>
+                <a class="text-decoration-none"
+                   href="{{ path('admin_world_show', { id: character.world.id }) }}">#{{ character.world.id }}</a>
                 · Race: <strong>{{ character.race.value }}</strong>
                 · Location: <strong>({{ character.tileX }}, {{ character.tileY }})</strong>
             </div>
         </div>
-        <div class="page-header__actions">
-            <a class="btn" href="{{ path('admin_world_show', { id: character.world.id }) }}">Back to world</a>
+        <div class="ms-3">
+            <a class="btn btn-outline-secondary btn-sm"
+               href="{{ path('admin_world_show', { id: character.world.id }) }}">Back to world</a>
         </div>
     </div>
 
-    <section class="panel">
-        <h2>Overview</h2>
-        <table class="table table--kv">
-            <tbody>
-            <tr>
-                <th>Powerlevel</th>
-                <td>{{ powerLevel }}</td>
-            </tr>
-            <tr>
-                <th>Job</th>
-                <td>{{ jobLabel }}</td>
-            </tr>
-            <tr>
-                <th>Archetype</th>
-                <td>{{ archetype|default('') }}</td>
-            </tr>
-            <tr>
-                <th>Money</th>
-                <td>${{ character.money }}</td>
-            </tr>
-            <tr>
-                <th>Location</th>
-                <td>({{ character.tileX }}, {{ character.tileY }})</td>
-            </tr>
-            <tr>
-                <th>Strength</th>
-                <td>{{ stat_tier_label(character.strength) }} ({{ character.strength }})</td>
-            </tr>
-            <tr>
-                <th>Ki Control</th>
-                <td>{{ stat_tier_label(character.kiControl) }} ({{ character.kiControl }})</td>
-            </tr>
-            <tr>
-                <th>Ki Capacity</th>
-                <td>{{ character.kiCapacity }}</td>
-            </tr>
-            <tr>
-                <th>Ki Recovery</th>
-                <td>{{ character.kiRecovery }}</td>
-            </tr>
-            <tr>
-                <th>Speed</th>
-                <td>{{ character.speed }}</td>
-            </tr>
-            <tr>
-                <th>Endurance</th>
-                <td>{{ character.endurance }}</td>
-            </tr>
-            <tr>
-                <th>Durability</th>
-                <td>{{ character.durability }}</td>
-            </tr>
-            <tr>
-                <th>Focus</th>
-                <td>{{ character.focus }}</td>
-            </tr>
-            <tr>
-                <th>Discipline</th>
-                <td>{{ character.discipline }}</td>
-            </tr>
-            <tr>
-                <th>Adaptability</th>
-                <td>{{ character.adaptability }}</td>
-            </tr>
-            </tbody>
-        </table>
-    </section>
-
-    <section class="panel">
-        <h2>Event history</h2>
-        <div class="muted" style="margin-bottom: 0.75rem;">
-            {{ eventTotal|default(0) }} event(s) · page {{ eventPage|default(1) }}/{{ eventTotalPages|default(1) }}
+    <div class="row g-3">
+        <div class="col-12 col-lg-4">
+            <div class="card shadow-sm">
+                <div class="card-header">Overview</div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0">
+                        <tbody>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Powerlevel</th>
+                            <td>{{ powerLevel }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Job</th>
+                            <td>{{ jobLabel }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Archetype</th>
+                            <td>{{ archetype|default('') }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Money</th>
+                            <td>${{ character.money }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Location</th>
+                            <td>({{ character.tileX }}, {{ character.tileY }})</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Strength</th>
+                            <td>{{ stat_tier_label(character.strength) }} ({{ character.strength }})</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Ki Control</th>
+                            <td>{{ stat_tier_label(character.kiControl) }} ({{ character.kiControl }})</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Ki Capacity</th>
+                            <td>{{ character.kiCapacity }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Ki Recovery</th>
+                            <td>{{ character.kiRecovery }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Speed</th>
+                            <td>{{ character.speed }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Endurance</th>
+                            <td>{{ character.endurance }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Durability</th>
+                            <td>{{ character.durability }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Focus</th>
+                            <td>{{ character.focus }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Discipline</th>
+                            <td>{{ character.discipline }}</td>
+                        </tr>
+                        <tr>
+                            <th class="text-nowrap" scope="row">Adaptability</th>
+                            <td>{{ character.adaptability }}</td>
+                        </tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <div style="display:flex; gap: 0.5rem; align-items:center; margin-bottom: 0.75rem;">
-            {% set page = eventPage|default(1) %}
-            {% set pages = eventTotalPages|default(1) %}
+        <div class="col-12 col-lg-8">
+            <div class="card shadow-sm">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <span>Event history</span>
+                    <span class="text-secondary small">
+                        {{ eventTotal|default(0) }} event(s) · page {{ eventPage|default(1) }}/{{ eventTotalPages|default(1) }}
+                    </span>
+                </div>
 
-            <a class="btn"
-               href="{{ path('admin_character_show', { id: character.id, page: 1, perPage: eventPerPage|default(50) }) }}">First</a>
-            {% if page > 1 %}
-                <a class="btn"
-                   href="{{ path('admin_character_show', { id: character.id, page: page - 1, perPage: eventPerPage|default(50) }) }}">Prev</a>
-            {% else %}
-                <span class="muted">Prev</span>
-            {% endif %}
+                {% set page = eventPage|default(1) %}
+                {% set pages = eventTotalPages|default(1) %}
+                {% set perPage = eventPerPage|default(50) %}
 
-            {% if page < pages %}
-                <a class="btn"
-                   href="{{ path('admin_character_show', { id: character.id, page: page + 1, perPage: eventPerPage|default(50) }) }}">Next</a>
-            {% else %}
-                <span class="muted">Next</span>
-            {% endif %}
-            <a class="btn"
-               href="{{ path('admin_character_show', { id: character.id, page: pages, perPage: eventPerPage|default(50) }) }}">Last</a>
-        </div>
+                <div class="card-body py-2">
+                    <nav aria-label="Event history pagination">
+                        <ul class="pagination pagination-sm mb-0">
+                            <li class="page-item{% if page <= 1 %} disabled{% endif %}">
+                                {% if page <= 1 %}
+                                    <span class="page-link">First</span>
+                                {% else %}
+                                    <a class="page-link"
+                                       href="{{ path('admin_character_show', { id: character.id, page: 1, perPage: perPage }) }}">First</a>
+                                {% endif %}
+                            </li>
+                            <li class="page-item{% if page <= 1 %} disabled{% endif %}">
+                                {% if page <= 1 %}
+                                    <span class="page-link">Prev</span>
+                                {% else %}
+                                    <a class="page-link"
+                                       href="{{ path('admin_character_show', { id: character.id, page: page - 1, perPage: perPage }) }}">Prev</a>
+                                {% endif %}
+                            </li>
+                            <li class="page-item{% if page >= pages %} disabled{% endif %}">
+                                {% if page >= pages %}
+                                    <span class="page-link">Next</span>
+                                {% else %}
+                                    <a class="page-link"
+                                       href="{{ path('admin_character_show', { id: character.id, page: page + 1, perPage: perPage }) }}">Next</a>
+                                {% endif %}
+                            </li>
+                            <li class="page-item{% if page >= pages %} disabled{% endif %}">
+                                {% if page >= pages %}
+                                    <span class="page-link">Last</span>
+                                {% else %}
+                                    <a class="page-link"
+                                       href="{{ path('admin_character_show', { id: character.id, page: pages, perPage: perPage }) }}">Last</a>
+                                {% endif %}
+                            </li>
+                        </ul>
+                    </nav>
+                </div>
 
-        <table class="table">
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>Day</th>
-                <th>Type</th>
-                <th>Created</th>
-                <th>Data</th>
-            </tr>
-            </thead>
-            <tbody>
-            {% for event in eventHistory %}
-                <tr>
-                    <td>#{{ event.id }}</td>
-                    <td>{{ event.day }}</td>
-                    <td><code>{{ event.type }}</code></td>
-                    <td>{{ event.createdAt|date('Y-m-d H:i') }}</td>
-                    <td>
-                        {% if event.data is not empty %}
-                            <code>{{ event.data|json_encode }}</code>
+                <div class="table-responsive">
+                    <table class="table table-striped table-hover table-sm align-middle mb-0">
+                        <thead class="table-light">
+                        <tr>
+                            <th>ID</th>
+                            <th>Day</th>
+                            <th>Type</th>
+                            <th>Created</th>
+                            <th>Data</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for event in eventHistory %}
+                            <tr>
+                                <td>#{{ event.id }}</td>
+                                <td>{{ event.day }}</td>
+                                <td><code>{{ event.type }}</code></td>
+                                <td>{{ event.createdAt|date('Y-m-d H:i') }}</td>
+                                <td>
+                                    {% if event.data is not empty %}
+                                        <code class="text-break">{{ event.data|json_encode }}</code>
+                                    {% else %}
+                                        <span class="text-secondary">—</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
                         {% else %}
-                            <span class="muted">—</span>
-                        {% endif %}
-                    </td>
-                </tr>
-            {% else %}
-                <tr>
-                    <td colspan="5" class="muted">No events for this character yet.</td>
-                </tr>
-            {% endfor %}
-            </tbody>
-        </table>
-    </section>
+                            <tr>
+                                <td colspan="5" class="text-secondary text-center py-4">No events for this character
+                                    yet.
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock %}

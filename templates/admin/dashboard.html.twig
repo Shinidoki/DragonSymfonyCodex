@@ -3,21 +3,28 @@
 {% block admin_title %}Dashboard{% endblock %}
 
 {% block admin_body %}
-    <h1>Dashboard</h1>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h1 class="mb-0">Dashboard</h1>
+    </div>
 
-    <div class="cards">
-        <div class="card">
-            <div class="card__label">Worlds</div>
-            <div class="card__value">{{ worldCount }}</div>
-            <div class="card__actions">
-                <a class="btn" href="{{ path('admin_world_index') }}">View worlds</a>
+    <div class="row g-3">
+        <div class="col-12 col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="text-secondary small">Worlds</div>
+                    <div class="display-6">{{ worldCount }}</div>
+                    <a class="btn btn-sm btn-primary mt-2" href="{{ path('admin_world_index') }}">View worlds</a>
+                </div>
             </div>
         </div>
 
-        <div class="card">
-            <div class="card__label">Characters</div>
-            <div class="card__value">{{ characterCount }}</div>
+        <div class="col-12 col-md-6">
+            <div class="card shadow-sm">
+                <div class="card-body">
+                    <div class="text-secondary small">Characters</div>
+                    <div class="display-6">{{ characterCount }}</div>
+                </div>
+            </div>
         </div>
     </div>
 {% endblock %}
-

@@ -3,44 +3,59 @@
 {% block title %}Log in{% endblock %}
 
 {% block body %}
-    <main class="container">
-        <section class="panel" style="max-width: 520px; margin: 3rem auto;">
-            <h1>Sign in</h1>
+    <main class="container py-5">
+        <div class="row justify-content-center">
+            <div class="col-12 col-md-6 col-lg-5">
+                <div class="card shadow-sm">
+                    <div class="card-body">
+                        <h1 class="h4 mb-3">Sign in</h1>
 
-            <form method="post">
-                {% if error %}
-                    <div class="flash flash--danger">{{ error.messageKey|trans(error.messageData, 'security') }}</div>
-                {% endif %}
+                        <form method="post">
+                            {% if error %}
+                                <div class="alert alert-danger" role="alert">
+                                    {{ error.messageKey|trans(error.messageData, 'security') }}
+                                </div>
+                            {% endif %}
 
-                {% if app.user %}
-                    <div class="muted" style="margin-bottom: 0.75rem;">
-                        Logged in as {{ app.user.userIdentifier }}, <a href="{{ logout_path() }}">logout</a>.
+                            {% if app.user %}
+                                <div class="alert alert-info py-2" role="alert">
+                                    Logged in as <strong>{{ app.user.userIdentifier }}</strong>,
+                                    <a class="alert-link" href="{{ logout_path() }}">logout</a>.
+                                </div>
+                            {% endif %}
+
+                            <div class="mb-3">
+                                <label class="form-label" for="username">Username</label>
+                                <input class="form-control"
+                                       type="text"
+                                       value="{{ last_username }}"
+                                       name="_username"
+                                       id="username"
+                                       autocomplete="username"
+                                       required
+                                       autofocus>
+                            </div>
+
+                            <div class="mb-3">
+                                <label class="form-label" for="password">Password</label>
+                                <input class="form-control"
+                                       type="password"
+                                       name="_password"
+                                       id="password"
+                                       autocomplete="current-password"
+                                       required>
+                            </div>
+
+                            <input type="hidden"
+                                   name="_csrf_token"
+                                   data-controller="csrf-protection"
+                                   value="{{ csrf_token('authenticate') }}">
+
+                            <button class="btn btn-primary w-100" type="submit">Sign in</button>
+                        </form>
                     </div>
-                {% endif %}
-
-                <div style="margin-bottom: 0.75rem;">
-                    <label for="username">Username</label>
-                    <input type="text"
-                           value="{{ last_username }}"
-                           name="_username"
-                           id="username"
-                           autocomplete="username"
-                           required
-                           autofocus>
                 </div>
-
-                <div style="margin-bottom: 0.75rem;">
-                    <label for="password">Password</label>
-                    <input type="password" name="_password" id="password" autocomplete="current-password" required>
-                </div>
-
-                <input type="hidden"
-                       name="_csrf_token"
-                       data-controller="csrf-protection"
-                       value="{{ csrf_token('authenticate') }}">
-
-                <button class="btn btn--primary" type="submit">Sign in</button>
-            </form>
-        </section>
+            </div>
+        </div>
     </main>
 {% endblock %}
