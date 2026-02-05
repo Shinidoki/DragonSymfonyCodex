@@ -38,10 +38,12 @@ class CharacterEventRepository extends ServiceEntityRepository
             ->andWhere('e.day <= :maxDay')
             ->andWhere('e.id > :minId')
             ->andWhere('(IDENTITY(e.character) = :characterId OR e.character IS NULL)')
+            ->andWhere('e.type NOT LIKE :logPrefix')
             ->setParameter('world', $world)
             ->setParameter('characterId', $characterId)
             ->setParameter('maxDay', $maxDay)
             ->setParameter('minId', $minIdExclusive)
+            ->setParameter('logPrefix', 'log.%')
             ->orderBy('e.id', 'ASC')
             ->getQuery()
             ->getResult();
@@ -62,8 +64,10 @@ class CharacterEventRepository extends ServiceEntityRepository
         $events = $this->createQueryBuilder('e')
             ->andWhere('e.world = :world')
             ->andWhere('e.day <= :maxDay')
+            ->andWhere('e.type NOT LIKE :logPrefix')
             ->setParameter('world', $world)
             ->setParameter('maxDay', $maxDay)
+            ->setParameter('logPrefix', 'log.%')
             ->orderBy('e.id', 'ASC')
             ->getQuery()
             ->getResult();

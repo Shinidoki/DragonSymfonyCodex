@@ -88,6 +88,33 @@
 
     <section class="panel">
         <h2>Event history</h2>
+        <div class="muted" style="margin-bottom: 0.75rem;">
+            {{ eventTotal|default(0) }} event(s) · page {{ eventPage|default(1) }}/{{ eventTotalPages|default(1) }}
+        </div>
+
+        <div style="display:flex; gap: 0.5rem; align-items:center; margin-bottom: 0.75rem;">
+            {% set page = eventPage|default(1) %}
+            {% set pages = eventTotalPages|default(1) %}
+
+            <a class="btn"
+               href="{{ path('admin_character_show', { id: character.id, page: 1, perPage: eventPerPage|default(50) }) }}">First</a>
+            {% if page > 1 %}
+                <a class="btn"
+                   href="{{ path('admin_character_show', { id: character.id, page: page - 1, perPage: eventPerPage|default(50) }) }}">Prev</a>
+            {% else %}
+                <span class="muted">Prev</span>
+            {% endif %}
+
+            {% if page < pages %}
+                <a class="btn"
+                   href="{{ path('admin_character_show', { id: character.id, page: page + 1, perPage: eventPerPage|default(50) }) }}">Next</a>
+            {% else %}
+                <span class="muted">Next</span>
+            {% endif %}
+            <a class="btn"
+               href="{{ path('admin_character_show', { id: character.id, page: pages, perPage: eventPerPage|default(50) }) }}">Last</a>
+        </div>
+
         <table class="table">
             <thead>
             <tr>

@@ -97,6 +97,16 @@ final class SimulationClock
                 }
 
                 $plan = null;
+                $day = $world->getCurrentDay();
+
+                $dailyLogData                            = [
+                    'activity'      => null,
+                    'work_fraction' => 0.0,
+                    'job_code'      => $character->getEmploymentJobCode(),
+                    'employment_x'  => $character->getEmploymentSettlementX(),
+                    'employment_y'  => $character->getEmploymentSettlementY(),
+                    'archetype'     => $profile instanceof NpcProfile ? $profile->getArchetype()->value : null,
+                ];
 
                 $goal = null;
                 if ($goalCatalog instanceof GoalCatalog && $character->getId() !== null) {
@@ -163,6 +173,8 @@ final class SimulationClock
                 }
 
                 $workFraction = $this->workFraction($character, $plan, $economyCatalog);
+                $dailyLogData['activity']                = $plan->activity->value;
+                $dailyLogData['work_fraction']           = $workFraction;
                 if ($economyCatalog instanceof EconomyCatalog && $workFraction > 0.0 && $character->isEmployed()) {
                     $sx      = (int)$character->getEmploymentSettlementX();
                     $sy      = (int)$character->getEmploymentSettlementY();
@@ -189,47 +201,61 @@ final class SimulationClock
                     }
 
                     $trainFraction = max(0.0, 1.0 - $workFraction);
+                    $dailyLogData['train_fraction']      = $trainFraction;
+                    $dailyLogData['training_multiplier'] = $multiplier;
+                    $dailyLogData['training_context']    = is_int($masterId) && $masterId > 0 ? 'dojo' : 'wilderness';
                     if ($trainFraction > 0.0) {
                         if ($economyCatalog instanceof EconomyCatalog && is_int($masterId) && $masterId > 0) {
                             $fee = $dojoTrainingFeesByCoord[$coordKey] ?? null;
                             if (is_int($fee) && $fee > 0) {
                                 if ($character->getMoney() < $fee) {
                                     // Can't pay for dojo training today.
-                                    $this->advanceTransformationDay($character, $transformations);
-                                    continue;
-                                }
+                                    $dailyLogData['skipped'] = 'dojo_fee_insufficient_funds';
+                                    $trainFraction           = 0.0;
+                                } else {
+                                    $taxRate = $economyCatalog->settlementTaxRate();
+                                    $tax     = (int)floor($fee * $taxRate);
+                                    if ($tax < 0) {
+                                        $tax = 0;
+                                    }
+                                    if ($tax > $fee) {
+                                        $tax = $fee;
+                                    }
 
-                                $taxRate = $economyCatalog->settlementTaxRate();
-                                $tax     = (int)floor($fee * $taxRate);
-                                if ($tax < 0) {
-                                    $tax = 0;
-                                }
-                                if ($tax > $fee) {
-                                    $tax = $fee;
-                                }
+                                    $character->addMoney(-$fee);
 
-                                $character->addMoney(-$fee);
+                                    $settlement = $settlementsByCoord[$coordKey] ?? null;
+                                    if ($settlement instanceof Settlement && $tax > 0) {
+                                        $settlement->addToTreasury($tax);
+                                    }
 
-                                $settlement = $settlementsByCoord[$coordKey] ?? null;
-                                if ($settlement instanceof Settlement && $tax > 0) {
-                                    $settlement->addToTreasury($tax);
-                                }
+                                    $master = $charactersById[(int)$masterId] ?? null;
+                                    if ($master instanceof Character) {
+                                        $master->addMoney($fee - $tax);
+                                    }
 
-                                $master = $charactersById[(int)$masterId] ?? null;
-                                if ($master instanceof Character) {
-                                    $master->addMoney($fee - $tax);
+                                    $dailyLogData['dojo_fee_paid'] = $fee;
                                 }
                             }
                         }
 
-                        $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $multiplier * $trainFraction);
-                        $character->applyCoreAttributes($after);
+                        if ($trainFraction > 0.0) {
+                            $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $multiplier * $trainFraction);
+                            $character->applyCoreAttributes($after);
+                        }
                     }
                 }
 
                 if ($plan->activity === DailyActivity::Travel) {
+                    $fromX = $character->getTileX();
+                    $fromY = $character->getTileY();
+
+                    $dailyLogData['travel_from_x'] = $fromX;
+                    $dailyLogData['travel_from_y'] = $fromY;
+
                     if (!$character->hasTravelTarget() && $plan->travelTarget instanceof TileCoord) {
                         $character->setTravelTarget($plan->travelTarget->x, $plan->travelTarget->y);
+                        $dailyLogData['travel_target_set'] = true;
 
                         if ($profile instanceof NpcProfile && $profile->getArchetype() === NpcArchetype::Wanderer) {
                             $profile->incrementWanderSequence();
@@ -242,13 +268,33 @@ final class SimulationClock
                         $next    = $stepper->step($current, $target);
                         $character->setTilePosition($next->x, $next->y);
 
+                        $dailyLogData['travel_target_x'] = $target->x;
+                        $dailyLogData['travel_target_y'] = $target->y;
+                        $dailyLogData['travel_to_x']     = $next->x;
+                        $dailyLogData['travel_to_y']     = $next->y;
+
                         if ($next->x === $target->x && $next->y === $target->y) {
                             $character->clearTravelTarget();
+                            $dailyLogData['travel_arrived'] = true;
+                        } else {
+                            $dailyLogData['travel_arrived'] = false;
                         }
+                    } else {
+                        $dailyLogData['travel_arrived'] = false;
+                        $dailyLogData['travel_to_x']    = $fromX;
+                        $dailyLogData['travel_to_y']    = $fromY;
                     }
                 }
 
                 $this->advanceTransformationDay($character, $transformations);
+
+                $emitted[] = new CharacterEvent(
+                    world: $world,
+                    character: $character,
+                    type: 'log.daily_action',
+                    day: $day,
+                    data: $dailyLogData,
+                );
             }
 
             $this->applyEconomyDay(
@@ -340,9 +386,21 @@ final class SimulationClock
                 $character->advanceDays(1);
 
                 if ((int)$character->getId() === $playerCharacterId) {
+                    $day = $world->getCurrentDay();
+
+                    $dailyLogData = [
+                        'activity'      => $trainingMultiplier !== null ? 'train' : 'rest',
+                        'work_fraction' => 0.0,
+                        'job_code'      => $character->getEmploymentJobCode(),
+                        'employment_x'  => $character->getEmploymentSettlementX(),
+                        'employment_y'  => $character->getEmploymentSettlementY(),
+                        'archetype'     => null,
+                    ];
+
                     if ($trainingMultiplier !== null) {
                         $coordKey = sprintf('%d:%d', $character->getTileX(), $character->getTileY());
                         $masterId = $dojoMasterCharacterIdByCoord[$coordKey] ?? null;
+                        $canTrain = true;
 
                         if ($economyCatalog instanceof EconomyCatalog && is_int($masterId) && $masterId > 0) {
                             $fee = $dojoTrainingFeesByCoord[$coordKey] ?? null;
@@ -368,19 +426,35 @@ final class SimulationClock
                                     if ($master instanceof Character) {
                                         $master->addMoney($fee - $tax);
                                     }
+
+                                    $dailyLogData['dojo_fee_paid'] = $fee;
                                 } else {
                                     // Can't pay for dojo training today; skip training.
-                                    $this->advanceTransformationDay($character, $transformations);
-                                    continue;
+                                    $dailyLogData['skipped'] = 'dojo_fee_insufficient_funds';
+                                    $canTrain                = false;
                                 }
                             }
                         }
 
-                        $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $trainingMultiplier);
-                        $character->applyCoreAttributes($after);
+                        if ($canTrain) {
+                            $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $trainingMultiplier);
+                            $character->applyCoreAttributes($after);
+
+                            $dailyLogData['train_fraction']      = 1.0;
+                            $dailyLogData['training_multiplier'] = $trainingMultiplier;
+                            $dailyLogData['training_context']    = is_int($masterId) && $masterId > 0 ? 'dojo' : 'wilderness';
+                        }
                     }
 
                     $this->advanceTransformationDay($character, $transformations);
+
+                    $emitted[] = new CharacterEvent(
+                        world: $world,
+                        character: $character,
+                        type: 'log.daily_action',
+                        day: $day,
+                        data: $dailyLogData,
+                    );
                     continue;
                 }
 
@@ -390,6 +464,16 @@ final class SimulationClock
                 }
 
                 $plan = null;
+                $day = $world->getCurrentDay();
+
+                $dailyLogData                            = [
+                    'activity'      => null,
+                    'work_fraction' => 0.0,
+                    'job_code'      => $character->getEmploymentJobCode(),
+                    'employment_x'  => $character->getEmploymentSettlementX(),
+                    'employment_y'  => $character->getEmploymentSettlementY(),
+                    'archetype'     => $profile instanceof NpcProfile ? $profile->getArchetype()->value : null,
+                ];
 
                 $goal = null;
                 if ($goalCatalog instanceof GoalCatalog && $character->getId() !== null) {
@@ -456,6 +540,8 @@ final class SimulationClock
                 }
 
                 $workFraction = $this->workFraction($character, $plan, $economyCatalog);
+                $dailyLogData['activity']                = $plan->activity->value;
+                $dailyLogData['work_fraction']           = $workFraction;
                 if ($economyCatalog instanceof EconomyCatalog && $workFraction > 0.0 && $character->isEmployed()) {
                     $sx      = (int)$character->getEmploymentSettlementX();
                     $sy      = (int)$character->getEmploymentSettlementY();
@@ -481,6 +567,9 @@ final class SimulationClock
                     }
 
                     $trainFraction = max(0.0, 1.0 - $workFraction);
+                    $dailyLogData['train_fraction']      = $trainFraction;
+                    $dailyLogData['training_multiplier'] = $multiplier;
+                    $dailyLogData['training_context']    = isset($dojoIndex[$coordKey]) ? 'dojo' : 'wilderness';
                     if ($trainFraction > 0.0) {
                         $after = $this->trainingGrowth->trainWithMultiplier($character->getCoreAttributes(), $intensity, $multiplier * $trainFraction);
                         $character->applyCoreAttributes($after);
@@ -488,8 +577,15 @@ final class SimulationClock
                 }
 
                 if ($plan->activity === DailyActivity::Travel) {
+                    $fromX = $character->getTileX();
+                    $fromY = $character->getTileY();
+
+                    $dailyLogData['travel_from_x'] = $fromX;
+                    $dailyLogData['travel_from_y'] = $fromY;
+
                     if (!$character->hasTravelTarget() && $plan->travelTarget instanceof TileCoord) {
                         $character->setTravelTarget($plan->travelTarget->x, $plan->travelTarget->y);
+                        $dailyLogData['travel_target_set'] = true;
 
                         if ($profile instanceof NpcProfile && $profile->getArchetype() === NpcArchetype::Wanderer) {
                             $profile->incrementWanderSequence();
@@ -502,13 +598,33 @@ final class SimulationClock
                         $next    = $stepper->step($current, $target);
                         $character->setTilePosition($next->x, $next->y);
 
+                        $dailyLogData['travel_target_x'] = $target->x;
+                        $dailyLogData['travel_target_y'] = $target->y;
+                        $dailyLogData['travel_to_x']     = $next->x;
+                        $dailyLogData['travel_to_y']     = $next->y;
+
                         if ($next->x === $target->x && $next->y === $target->y) {
                             $character->clearTravelTarget();
+                            $dailyLogData['travel_arrived'] = true;
+                        } else {
+                            $dailyLogData['travel_arrived'] = false;
                         }
+                    } else {
+                        $dailyLogData['travel_arrived'] = false;
+                        $dailyLogData['travel_to_x']    = $fromX;
+                        $dailyLogData['travel_to_y']    = $fromY;
                     }
                 }
 
                 $this->advanceTransformationDay($character, $transformations);
+
+                $emitted[] = new CharacterEvent(
+                    world: $world,
+                    character: $character,
+                    type: 'log.daily_action',
+                    day: $day,
+                    data: $dailyLogData,
+                );
             }
 
             $this->applyEconomyDay(

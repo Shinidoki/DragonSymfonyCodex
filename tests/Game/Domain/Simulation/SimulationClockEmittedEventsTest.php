@@ -30,7 +30,10 @@ final class SimulationClockEmittedEventsTest extends TestCase
 
         $events = $clock->advanceDays($world, [$character], 1, TrainingIntensity::Normal);
 
-        self::assertSame([], $events);
+        self::assertCount(1, $events);
+        self::assertSame('log.daily_action', $events[0]->getType());
+        self::assertSame(1, $events[0]->getDay());
+        self::assertSame('train', $events[0]->getData()['activity'] ?? null);
     }
 
     public function testAdvanceDaysCollectsEventsEmittedByCurrentGoalHandler(): void
@@ -98,10 +101,11 @@ final class SimulationClockEmittedEventsTest extends TestCase
             goalCatalog: $catalog,
         );
 
-        self::assertCount(1, $events);
-        self::assertSame('test.event', $events[0]->getType());
-        self::assertSame(1, $events[0]->getDay());
-        self::assertSame(['foo' => 'bar'], $events[0]->getData());
+        self::assertCount(2, $events);
+
+        $types = array_map(static fn(CharacterEvent $e): string => $e->getType(), $events);
+        sort($types);
+        self::assertSame(['log.daily_action', 'test.event'], $types);
     }
 
     private function setEntityId(object $entity, int $id): void

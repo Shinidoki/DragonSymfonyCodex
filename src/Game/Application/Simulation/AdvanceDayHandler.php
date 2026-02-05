@@ -239,7 +239,7 @@ final class AdvanceDayHandler
             return new AdvanceDayResult($world, $characters, $days);
         }
 
-        $this->clock->advanceDays(
+        $emitted = $this->clock->advanceDays(
             world: $world,
             characters: $characters,
             days: $days,
@@ -253,6 +253,10 @@ final class AdvanceDayHandler
             settlements: $settlementEntities,
             economyCatalog: $economyCatalog,
         );
+
+        foreach ($emitted as $event) {
+            $this->entityManager->persist($event);
+        }
         $this->entityManager->flush();
 
         if ($this->abandonUnderpopulatedSettlements($world, $characters)) {
