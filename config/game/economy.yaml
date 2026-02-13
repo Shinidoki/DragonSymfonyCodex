@@ -66,3 +66,12 @@ tournaments:
         prosperity_base: 1
         prosperity_per_spend: 150
         per_participant_fame: 1
+
+tournament_interest:
+    commit_threshold: 60
+    weights:
+        distance: 30
+        prize_pool: 25
+        archetype_bias: 20
+        money_pressure: 15
+        cooldown_penalty: 20

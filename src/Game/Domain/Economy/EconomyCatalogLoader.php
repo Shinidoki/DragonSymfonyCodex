@@ -209,6 +209,39 @@ final class EconomyCatalogLoader
             }
         }
 
+        $tournamentInterest = $raw['tournament_interest'] ?? [];
+        if (!is_array($tournamentInterest)) {
+            throw new \InvalidArgumentException('tournament_interest must be a mapping when provided.');
+        }
+
+        $interestThreshold = $tournamentInterest['commit_threshold'] ?? 60;
+        if (!is_int($interestThreshold) || $interestThreshold < 0 || $interestThreshold > 100) {
+            throw new \InvalidArgumentException('tournament_interest.commit_threshold must be an integer between 0 and 100.');
+        }
+
+        $interestWeights = $tournamentInterest['weights'] ?? [];
+        if (!is_array($interestWeights)) {
+            throw new \InvalidArgumentException('tournament_interest.weights must be a mapping when provided.');
+        }
+
+        $interestDistance = $interestWeights['distance'] ?? 30;
+        $interestPrizePool = $interestWeights['prize_pool'] ?? 25;
+        $interestArchetypeBias = $interestWeights['archetype_bias'] ?? 20;
+        $interestMoneyPressure = $interestWeights['money_pressure'] ?? 15;
+        $interestCooldownPenalty = $interestWeights['cooldown_penalty'] ?? 20;
+
+        foreach ([
+            'tournament_interest.weights.distance' => $interestDistance,
+            'tournament_interest.weights.prize_pool' => $interestPrizePool,
+            'tournament_interest.weights.archetype_bias' => $interestArchetypeBias,
+            'tournament_interest.weights.money_pressure' => $interestMoneyPressure,
+            'tournament_interest.weights.cooldown_penalty' => $interestCooldownPenalty,
+        ] as $key => $val) {
+            if (!is_int($val) || $val < 0) {
+                throw new \InvalidArgumentException(sprintf('%s must be an integer >= 0.', $key));
+            }
+        }
+
         return new EconomyCatalog(
             jobs: $jobDefs,
             employmentPools: $employmentPools,
@@ -241,6 +274,16 @@ final class EconomyCatalogLoader
                     'prosperity_base'      => $prosBase,
                     'prosperity_per_spend' => $prosPerSpend,
                     'per_participant_fame' => $perParticipantFame,
+                ],
+            ],
+            tournamentInterest: [
+                'commit_threshold' => $interestThreshold,
+                'weights' => [
+                    'distance' => $interestDistance,
+                    'prize_pool' => $interestPrizePool,
+                    'archetype_bias' => $interestArchetypeBias,
+                    'money_pressure' => $interestMoneyPressure,
+                    'cooldown_penalty' => $interestCooldownPenalty,
                 ],
             ],
         );

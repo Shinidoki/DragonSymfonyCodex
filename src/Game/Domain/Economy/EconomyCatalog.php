@@ -11,6 +11,8 @@ namespace App\Game\Domain\Economy;
  * @phpstan-type TournamentRadiusDef array{base:int,per_spend:int,max:int}
  * @phpstan-type TournamentGainsDef array{fame_base:int,fame_per_spend:int,prosperity_base:int,prosperity_per_spend:int,per_participant_fame:int}
  * @phpstan-type TournamentsDef array{min_spend:int,max_spend_fraction_of_treasury:float,prize_pool_fraction:float,duration_days:int,radius:TournamentRadiusDef,gains:TournamentGainsDef}
+ * @phpstan-type TournamentInterestWeightsDef array{distance:int,prize_pool:int,archetype_bias:int,money_pressure:int,cooldown_penalty:int}
+ * @phpstan-type TournamentInterestDef array{commit_threshold:int,weights:TournamentInterestWeightsDef}
  */
 final readonly class EconomyCatalog
 {
@@ -26,6 +28,7 @@ final readonly class EconomyCatalog
         private array $settlement,
         private array $thresholds,
         private array $tournaments = [],
+        private array $tournamentInterest = [],
     )
     {
     }
@@ -186,6 +189,36 @@ final readonly class EconomyCatalog
     public function tournamentPerParticipantFame(): int
     {
         return (int)($this->tournaments['gains']['per_participant_fame'] ?? 0);
+    }
+
+    public function tournamentInterestCommitThreshold(): int
+    {
+        return (int)($this->tournamentInterest['commit_threshold'] ?? 60);
+    }
+
+    public function tournamentInterestWeightDistance(): int
+    {
+        return (int)($this->tournamentInterest['weights']['distance'] ?? 30);
+    }
+
+    public function tournamentInterestWeightPrizePool(): int
+    {
+        return (int)($this->tournamentInterest['weights']['prize_pool'] ?? 25);
+    }
+
+    public function tournamentInterestWeightArchetypeBias(): int
+    {
+        return (int)($this->tournamentInterest['weights']['archetype_bias'] ?? 20);
+    }
+
+    public function tournamentInterestWeightMoneyPressure(): int
+    {
+        return (int)($this->tournamentInterest['weights']['money_pressure'] ?? 15);
+    }
+
+    public function tournamentInterestWeightCooldownPenalty(): int
+    {
+        return (int)($this->tournamentInterest['weights']['cooldown_penalty'] ?? 20);
     }
 
     /**
