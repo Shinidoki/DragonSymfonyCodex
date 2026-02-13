@@ -10,6 +10,7 @@ use App\Game\Application\Dojo\DojoLifecycleService;
 use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
+use App\Game\Application\Settlement\SettlementMigrationPressureService;
 use App\Game\Application\Settlement\SettlementProjectLifecycleService;
 use App\Game\Application\Tournament\TournamentInterestService;
 use App\Game\Application\Tournament\TournamentLifecycleService;
@@ -53,6 +54,7 @@ final class AdvanceDayHandler
         private readonly ?SettlementSimulationContextBuilder $settlementContextBuilder = null,
         private readonly ?DojoLifecycleService               $dojoLifecycle = null,
         private readonly ?TournamentInterestService          $tournamentInterestService = null,
+        private readonly ?SettlementMigrationPressureService $settlementMigrationPressureService = null,
     )
     {
     }
@@ -209,6 +211,29 @@ final class AdvanceDayHandler
                         );
                         $this->entityManager->flush();
                     }
+                }
+
+                if (
+                    $this->settlementMigrationPressureService instanceof SettlementMigrationPressureService
+                    && $economyCatalog instanceof EconomyCatalog
+                    && $settlementEntities !== []
+                ) {
+                    $migrationEvents = $this->settlementMigrationPressureService->advanceDay(
+                        world: $world,
+                        worldDay: $world->getCurrentDay(),
+                        characters: $characters,
+                        settlements: $settlementEntities,
+                    );
+
+                    foreach ($migrationEvents as $event) {
+                        $this->entityManager->persist($event);
+                    }
+
+                    if ($migrationEvents !== []) {
+                        $emitted = [...$emitted, ...$migrationEvents];
+                    }
+
+                    $this->entityManager->flush();
                 }
 
                 if (
