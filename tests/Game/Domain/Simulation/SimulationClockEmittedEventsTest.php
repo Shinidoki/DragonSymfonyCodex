@@ -108,6 +108,74 @@ final class SimulationClockEmittedEventsTest extends TestCase
         self::assertSame(['log.daily_action', 'test.event'], $types);
     }
 
+    public function testAdvanceDaysPassesTournamentFeedbackMapIntoGoalContext(): void
+    {
+        $world = new World('seed-1');
+        $character = new Character($world, 'NPC-0001', Race::Human);
+        $this->setEntityId($character, 1);
+
+        $goal = new CharacterGoal($character);
+        $goal->setLifeGoalCode('test.life');
+        $goal->setCurrentGoalCode('goal.capture_context');
+        $goal->setCurrentGoalComplete(false);
+
+        $handler = new class implements CurrentGoalHandlerInterface {
+            /** @var array<string,array{spendMultiplier:float,radiusDelta:int,sampleSize:int}> */
+            public array $captured = [];
+
+            public function step(Character $character, World $world, array $data, GoalContext $context): GoalStepResult
+            {
+                $this->captured = $context->settlementTournamentFeedbackByCoord;
+
+                return new GoalStepResult(
+                    plan: new DailyPlan(DailyActivity::Rest),
+                    data: $data,
+                    completed: true,
+                );
+            }
+        };
+
+        $catalog = new GoalCatalog(
+            lifeGoals: [
+                'test.life' => [
+                    'current_goal_pool' => [
+                        ['code' => 'goal.capture_context', 'weight' => 1],
+                    ],
+                ],
+            ],
+            currentGoals: [
+                'goal.capture_context' => [
+                    'interruptible' => true,
+                    'defaults'      => [],
+                    'handler'       => $handler::class,
+                ],
+            ],
+            npcLifeGoals: [],
+            eventRules: [],
+        );
+
+        $clock = new SimulationClock(
+            new TrainingGrowthService(),
+            goalPlanner: new GoalPlanner([$handler]),
+        );
+
+        $clock->advanceDays(
+            world: $world,
+            characters: [$character],
+            days: 1,
+            intensity: TrainingIntensity::Normal,
+            goalsByCharacterId: [1 => $goal],
+            goalCatalog: $catalog,
+            settlementTournamentFeedbackByCoord: [
+                '1:2' => ['spendMultiplier' => 1.2, 'radiusDelta' => 2, 'sampleSize' => 4],
+            ],
+        );
+
+        self::assertSame([
+            '1:2' => ['spendMultiplier' => 1.2, 'radiusDelta' => 2, 'sampleSize' => 4],
+        ], $handler->captured);
+    }
+
     private function setEntityId(object $entity, int $id): void
     {
         $ref = new \ReflectionProperty($entity::class, 'id');

@@ -66,6 +66,7 @@ final class SimulationClock
         array $dojoTrainingMultipliersByCoord = [],
         array $dojoMasterCharacterIdByCoord = [],
         array $dojoTrainingFeesByCoord = [],
+        array $settlementTournamentFeedbackByCoord = [],
     ): array
     {
         if ($days < 0) {
@@ -132,6 +133,7 @@ final class SimulationClock
                                     settlementBuildingsByCoord: $settlementBuildingsByCoord,
                                     activeSettlementProjectsByCoord: $activeSettlementProjectsByCoord,
                                     economyCatalog: $economyCatalog,
+                                    settlementTournamentFeedbackByCoord: $settlementTournamentFeedbackByCoord,
                                     events: $events,
                                 ),
                                 catalog: $goalCatalog,
@@ -354,6 +356,7 @@ final class SimulationClock
         array $dojoTrainingMultipliersByCoord = [],
         array $dojoMasterCharacterIdByCoord = [],
         array $dojoTrainingFeesByCoord = [],
+        array $settlementTournamentFeedbackByCoord = [],
     ): array
     {
         if ($days < 0) {
@@ -499,6 +502,7 @@ final class SimulationClock
                                     settlementBuildingsByCoord: $settlementBuildingsByCoord,
                                     activeSettlementProjectsByCoord: $activeSettlementProjectsByCoord,
                                     economyCatalog: $economyCatalog,
+                                    settlementTournamentFeedbackByCoord: $settlementTournamentFeedbackByCoord,
                                     events: $events,
                                 ),
                                 catalog: $goalCatalog,
