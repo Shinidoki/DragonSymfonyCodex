@@ -1,0 +1,124 @@
+name: Bug (AI-ready)
+description: Report a defect with reproducible steps and expected behavior.
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug.
+
+        This template is optimized for coding-AI execution.
+        Please include reproducible details and clear expected behavior.
+
+        **Execution constraints**
+        - Work branch: `agent/shiniclaw-work`
+        - Do not push directly to `master`
+        - Local workflow: `make up`, `make test`, `make down`
+
+  - type: input
+    id: summary
+    attributes:
+      label: Bug summary
+      placeholder: Login succeeds but redirects to a 500 page for admin users.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - Critical (blocking)
+        - High
+        - Medium
+        - Low
+    validations:
+      required: true
+
+  - type: textarea
+    id: current
+    attributes:
+      label: Current behavior
+      placeholder: Describe what currently happens.
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+      placeholder: Describe what should happen instead.
+    validations:
+      required: true
+
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start stack with `make up`
+        2. Open `http://127.0.0.1:8087/login`
+        3. Log in as admin
+        4. Observe error on redirect
+    validations:
+      required: true
+
+  - type: dropdown
+    id: reproducibility
+    attributes:
+      label: Reproducibility
+      options:
+        - Always
+        - Often
+        - Sometimes
+        - Once
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment details
+      value: |
+        - Repo: DragonSymfonyCodex
+        - Local URL: http://127.0.0.1:8087/
+        - Setup used: Docker local (`make setup` / `make up`)
+        - Branch tested:
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / stack traces / screenshots
+      description: Paste relevant logs and stack traces.
+      render: shell
+
+  - type: textarea
+    id: suspected-area
+    attributes:
+      label: Suspected area/files (optional)
+      placeholder: |
+        - src/Controller/SecurityController.php
+        - templates/security/login.html.twig
+        - config/packages/security.yaml
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Fix acceptance criteria
+      placeholder: |
+        - [ ] Bug no longer reproducible with listed steps
+        - [ ] Regression test added/updated
+        - [ ] Existing test suite passes (`make test`)
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification performed after fix
+      placeholder: |
+        - Commands run:
+        - URLs tested:
+        - Tests added/updated:
+    validations:
+      required: true

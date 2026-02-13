@@ -1,0 +1,95 @@
+name: Refactor / Chore (AI-ready)
+description: Track non-feature work like refactors, maintenance, cleanup, and technical debt.
+title: "[Chore]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this for internal improvements that don't primarily add user-facing functionality.
+
+        **Execution constraints**
+        - Work branch: `agent/shiniclaw-work`
+        - Do not push directly to `master`
+        - Verify with local Docker workflow and tests
+
+  - type: dropdown
+    id: type
+    attributes:
+      label: Work type
+      options:
+        - Refactor
+        - Chore
+        - Tech debt
+        - CI / tooling
+        - Documentation
+    validations:
+      required: true
+
+  - type: input
+    id: area
+    attributes:
+      label: Target area
+      placeholder: Doctrine repositories for world simulation queries.
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation / current pain
+      placeholder: Explain why this work is needed now.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      placeholder: |
+        - Extract duplicated query logic into shared method
+        - Rename service for clearer intent
+        - Keep behavior unchanged
+    validations:
+      required: true
+
+  - type: textarea
+    id: constraints
+    attributes:
+      label: Constraints
+      description: Backward compatibility, migration concerns, performance requirements, etc.
+      placeholder: Public API and DB schema must remain unchanged.
+
+  - type: textarea
+    id: risks
+    attributes:
+      label: Risks and rollback plan
+      placeholder: |
+        Risks:
+        - Hidden behavior coupling in existing services
+
+        Rollback:
+        - Revert PR commit(s)
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      placeholder: |
+        - [ ] Behavior remains unchanged (or explicitly documented)
+        - [ ] Code is simpler/clearer with reduced duplication
+        - [ ] Tests pass and coverage for touched paths remains adequate
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification steps
+      value: |
+        - `make test`
+        - Run any affected Symfony commands manually if relevant
+        - Confirm no unintended UI/API behavior changes
+    validations:
+      required: true
