@@ -1,361 +1,143 @@
-# World Map & Location Model
+# World Map & Combat Location Model
 
-**Design Document**
+**Design Document (Cutover-aligned)**
 
 ---
 
 ## 1. Purpose
 
-This document defines how **space and location** are structured in the game universe and how they interact with time, simulation fidelity, NPC behavior, travel, encounters, and combat.
+This document defines how space is modeled after the hard local-zone cutover.
 
 The model must:
 
-* Support a **large, living world**
-* Scale from **local tactical play** to **planetary exploration**
-* Integrate cleanly with the time & simulation system
-* Remain expandable to **multiple planets** without redesign
-
-The design is inspired by the spatial logic of the **Dragon Ball**, where worlds are vast, travel matters, and major events can occur far from the protagonist.
+- Keep a large persistent world
+- Support travel and settlement-scale simulation
+- Trigger turn-based RPG fights when conflicts happen
+- Avoid reintroducing local tactical map runtime concepts
 
 ---
 
-## 2. Top-Level Spatial Hierarchy
+## 2. Spatial Hierarchy
 
-The universe is structured into **three spatial layers**, ordered from largest to smallest:
+The game uses three persistent spatial layers plus one ephemeral combat context:
 
 1. **Universe**
 2. **Planet**
 3. **World Map Tile**
-4. **Encounter Space**
+4. **Fight Encounter (ephemeral, combat-only)**
 
-Only the lowest layer (encounter space) operates at full tick-level detail.
+There is **no separate encounter-space/local-zone map** in runtime.
 
 ---
 
 ## 3. Universe Layer
 
-### 3.1 Definition
+The Universe is a top-level container for one or more planets and their long-term history.
 
-The **Universe** is the top-level container.
-
-It contains:
-
-* One or more planets
-* Global history and events
-* Cross-planet factions and legends
-
-The universe itself does not simulate spatial detail; it only coordinates planets.
+It coordinates cross-planet structure but does not run per-action tactical simulation.
 
 ---
 
 ## 4. Planet Layer
 
-### 4.1 Planet as a World Container
+A Planet is a world container with:
 
-Each **planet** is a self-contained world with:
+- geography
+- populations
+- settlements/factions
+- ongoing simulation history
 
-* Its own geography
-* NPC population
-* Cultures and factions
-* Conflicts and history
-
-The initial implementation focuses on **one primary planet**, but the design assumes more will be added later.
+Initial implementation focuses on one primary planet, but the model remains multi-planet compatible.
 
 ---
 
-### 4.2 Planet Properties
+## 5. World Map Layer
 
-A planet may define:
+### 5.1 World map overview
 
-* Gravity rules
-* Atmospheric constraints
-* Travel limitations
-* Environmental hazards
+Each planet has a tile-based world map used for:
 
-These properties influence:
+- travel
+- settlement placement
+- background simulation context
+- conflict/event staging
 
-* Movement speed
-* Combat behavior
-* Training efficiency
-* Survival requirements
+Tiles represent large regions, not tactical grids.
 
----
+### 5.2 Tile properties
 
-### 4.3 Interplanetary Travel (Deferred Feature)
+A tile may include:
 
-Interplanetary travel:
+- terrain/biome tags
+- settlement presence
+- infrastructure markers (e.g., dojo)
+- threat/activity context
 
-* Is explicit and intentional
-* Requires technology, abilities, or special locations
-* Consumes significant time
-* Is rare compared to planetary travel
+### 5.3 Movement model
 
-NPCs and the player cannot accidentally move between planets.
+Movement across tiles consumes macro time and is resolved by simulation flow.
 
----
-
-## 5. World Map Layer (Per Planet)
-
-### 5.1 World Map Overview
-
-Each planet contains a **World Map**.
-
-The world map:
-
-* Is divided into **tiles**
-* Represents large-scale geography
-* Handles exploration, travel, and encounters
-
-World map tiles may represent:
-
-* Regions
-* Biomes
-* City zones
-* Large wilderness areas
-
-Tile size is **variable** and content-driven.
+No cell-by-cell player navigation layer exists in this architecture.
 
 ---
 
-### 5.2 World Map Tile Properties
+## 6. Fight Encounter Context (Combat-only)
 
-Each tile may include:
+When conflict resolves into combat, the system opens an **ephemeral fight encounter context**.
 
-* Terrain type
-* Points of interest
-* Settlements
-* Roads or travel routes
-* Threat level
+This context is:
 
-A tile does **not** simulate per-tick actions.
+- turn-based
+- speed/initiative driven
+- focused on combat resolution only
+- not a persistent tactical map layer
 
----
-
-### 5.3 World Map Movement & Time
-
-Movement on the world map:
-
-* Consumes **time**, not ticks
-* Time cost depends on:
-
-    * Distance
-    * Terrain
-    * Mode of travel (walking, vehicle, flying, etc.)
-
-Travel may:
-
-* Trigger encounters
-* Advance background simulation
-* Cause world events to resolve
-
-The player does not act tick-by-tick on the world map.
+After combat resolves, simulation continues on the world map timeline.
 
 ---
 
-## 6. Encounter Space Layer
+## 7. Targeting Model (Basic)
 
-### 6.1 Encounter Space Overview
+Combat targeting is intentionally minimal:
 
-Entering a world map tile transitions the player into a **encounter space**.
+- **single-target**: one enemy
+- **aoe**: all enemies in the current fight
 
-A encounter space:
+Non-goals in this architecture:
 
-* Is grid-based (cells)
-* Represents concrete, explorable space
-* Is where all tick-based simulation occurs
-
-Encounter spaces may represent:
-
-* City streets
-* Villages
-* Interiors
-* Wilderness sections
-* Battlefields
+- directional targeting
+- point/cell targeting
+- line/ray/path targeting on a local grid
 
 ---
 
-### 6.2 Encounter Space Size & Variability
+## 8. Simulation Fidelity
 
-Encounter space size:
+### 8.1 World simulation
 
-* Is variable
-* Depends on tile type and context
-* Is designed for tactical play
+Outside active fights, characters are simulated through world/day resolution loops, goals, and events.
 
-Encounter spaces are intentionally limited in scope to support:
+### 8.2 Fight simulation
 
-* Turn-based combat
-* NPC interaction
-* Clear spatial reasoning
+Inside active fights, actions resolve in turn order with one action per turn step and speed-based frequency effects.
 
 ---
 
-## 7. Simulation Zones & Fidelity
+## 9. Persistence
 
-### 7.1 Active Encounter
+Persistent world state remains map/event/entity-driven:
 
-The **Active Encounter** is the current encounter space.
+- character progression and outcomes
+- settlement/economy changes
+- tournament/combat result events
 
-Entities in the Active Encounter:
-
-* Are simulated **per tick**
-* Act using the one-action-per-tick rule
-* Can observe and react to each other directly
-
-This includes:
-
-* Player
-* Nearby NPCs
-* Environmental objects
+Fight encounter context itself is ephemeral and does not represent a persistent local map state.
 
 ---
 
-### 7.2 Background Zone
+## 10. Summary
 
-Entities outside the Active Encounter:
-
-* Are simulated in **daily resolution**
-* Follow schedules and long-term goals
-* Continue to train, travel, and act
-
-This applies:
-
-* Across the same planet
-* Across other planets
-
----
-
-## 8. Transitions Between Layers
-
-### 8.1 World Map → Encounter Space
-
-When entering a tile:
-
-* Time stops advancing in world-map units
-* The encounter space is instantiated
-* Relevant NPCs are loaded into the Active Encounter
-
-NPCs are fast-forwarded to the current time before activation.
-
----
-
-### 8.2 Encounter Space → World Map
-
-When leaving an encounter space:
-
-* NPCs are summarized into:
-
-    * Current intent
-    * Position
-    * Condition
-* Background simulation resumes
-
-No NPC is frozen or reset.
-
----
-
-## 9. Encounters
-
-### 9.1 Encounter Sources
-
-Encounters may occur:
-
-* During world map travel
-* Upon entering a tile
-* While exploring an encounter space
-* Due to NPC goals (hunting, patrols, ambushes)
-
----
-
-### 9.2 Encounter Resolution
-
-Encounters:
-
-* Transition to an encounter space if combat or interaction occurs
-* May be avoided, escalated, or resolved socially
-* Are influenced by:
-
-    * Power perception
-    * Reputation
-    * Awareness
-
-Combat always occurs on an encounter space.
-
----
-
-## 10. Combat & Space Interaction
-
-* Combat is turn-based
-* Each action consumes one tick
-* Speed differences may allow multiple actions
-* Terrain and positioning matter
-* Combat does not advance world-map time
-
-Once combat ends, normal simulation resumes.
-
----
-
-## 11. NPC Interaction with the Map
-
-NPCs:
-
-* Travel across world map tiles
-* Enter and leave encounter spaces
-* Act based on goals and schedules
-* Cause changes to tiles (damage, destruction, protection)
-
-Strong NPCs may:
-
-* Roam across regions
-* Influence multiple tiles
-* Travel between planets (later)
-
----
-
-## 12. Persistence & History
-
-All spatial changes are persistent:
-
-* Destroyed locations remain destroyed
-* NPC deaths are permanent
-* Environmental changes are recorded as events
-
-The map becomes a **historical artifact** over time.
-
----
-
-## 13. Design Goals Recap
-
-This model ensures:
-
-* Large worlds without per-tick global simulation
-* Meaningful travel and distance
-* Tactical, readable combat
-* NPC autonomy at scale
-* Easy expansion to new planets
-
----
-
-## 14. Explicit Non-Goals (For Now)
-
-This document does not define:
-
-* Procedural terrain algorithms
-* Exact tile or map dimensions
-* Rendering or UI
-* Economy or resource systems
-
-These belong to later layers.
-
----
-
-## 15. Summary
-
-* The universe contains multiple planets
-* Each planet has its own world map
-* World maps handle scale and time
-* Encounter spaces handle detail and actions
-* Simulation fidelity increases with proximity
-* The system is expandable without redesign
-
-> **Scale lives on the world map; stories happen on the encounter space.**
+- Persistent space = Universe → Planet → World Map Tiles
+- Combat runs in a turn-based RPG encounter context
+- Targeting is basic only (single-target + AoE)
+- No encounter-space/local-zone runtime model remains

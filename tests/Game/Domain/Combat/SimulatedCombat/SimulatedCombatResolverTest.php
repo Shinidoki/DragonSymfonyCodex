@@ -75,7 +75,7 @@ final class SimulatedCombatResolverTest extends KernelTestCase
             name: 'Big Beam',
             type: TechniqueType::Charged,
             config: [
-                'delivery'      => 'point',
+                'delivery'      => 'single',
                 'aimModes'      => ['actor'],
                 'kiCost'        => 1,
                 'chargeTicks'   => 1,

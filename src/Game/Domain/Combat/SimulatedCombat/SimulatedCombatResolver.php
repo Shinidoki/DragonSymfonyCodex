@@ -278,25 +278,9 @@ final class SimulatedCombatResolver
 
         return match ($delivery) {
             'aoe' => $enemies,
-            'ray' => $this->selectRayTargets($enemies, (string)($config['piercing'] ?? 'first')),
-            'projectile', 'point' => [$this->pickOne($enemies)],
+            // Basic targeting model: everything else is single-target.
             default => [$this->pickOne($enemies)],
         };
-    }
-
-    /**
-     * @param list<CombatantState> $enemies
-     *
-     * @return list<CombatantState>
-     */
-    private function selectRayTargets(array $enemies, string $piercing): array
-    {
-        $piercing = strtolower(trim($piercing));
-        if ($piercing === 'first' || $piercing === '') {
-            return [$this->pickOne($enemies)];
-        }
-
-        return $enemies;
     }
 
     /**

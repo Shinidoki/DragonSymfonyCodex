@@ -33,8 +33,8 @@ final class TechniqueImportServiceTest extends KernelTestCase
             'enabled' => true,
             'version' => 1,
             'config' => [
-                'aimModes' => ['actor', 'dir', 'point'],
-                'delivery' => 'projectile',
+                'aimModes' => ['actor'],
+                'delivery' => 'single',
                 'kiCost'   => 3,
                 'range'    => 2,
             ],
@@ -50,8 +50,8 @@ final class TechniqueImportServiceTest extends KernelTestCase
             'enabled' => true,
             'version' => 2,
             'config' => [
-                'aimModes' => ['actor', 'dir', 'point'],
-                'delivery' => 'projectile',
+                'aimModes' => ['actor'],
+                'delivery' => 'single',
                 'kiCost'   => 4,
                 'range'    => 2,
             ],

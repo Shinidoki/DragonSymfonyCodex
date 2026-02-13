@@ -87,6 +87,8 @@ arrive.
 Gameplay runs through the overworld simulation and combat resolution flow.
 
 - Characters move and progress through world simulation commands.
+- Fights resolve in turn-based RPG combat encounters (no separate local tactical runtime).
+- Targeting model is basic: single-target and AoE only.
 - Events and combat outcomes are emitted as part of simulation/combat processing.
 - There is no separate local-zone runtime surface in this architecture.
 
