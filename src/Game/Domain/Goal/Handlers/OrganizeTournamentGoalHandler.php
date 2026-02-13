@@ -134,10 +134,18 @@ final class OrganizeTournamentGoalHandler implements CurrentGoalHandlerInterface
             );
         }
 
+        $feedbackKey = sprintf('%d:%d', $settlement->getX(), $settlement->getY());
+        $feedback    = $context->settlementTournamentFeedbackByCoord[$feedbackKey] ?? null;
+        $multiplier  = is_array($feedback) && is_numeric($feedback['spendMultiplier'] ?? null) ? (float)$feedback['spendMultiplier'] : 1.0;
+        $radiusDelta = is_array($feedback) && is_int($feedback['radiusDelta'] ?? null) ? $feedback['radiusDelta'] : 0;
+
         $spend = $data['spend'] ?? null;
         if (!is_int($spend) || $spend < $minSpend || $spend > $maxSpend) {
             $spend = random_int($minSpend, $maxSpend);
         }
+
+        $spend = (int)round($spend * $multiplier);
+        $spend = max($minSpend, min($maxSpend, $spend));
 
         $durationDays = $catalog->tournamentDurationDays();
         if ($durationDays < 1) {
@@ -149,7 +157,8 @@ final class OrganizeTournamentGoalHandler implements CurrentGoalHandlerInterface
         if ($perSpend > 0) {
             $radius += intdiv($spend, $perSpend);
         }
-        $radius = min($radius, $catalog->tournamentRadiusMax());
+        $radius += $radiusDelta;
+        $radius = max(0, min($radius, $catalog->tournamentRadiusMax()));
 
         $prizePool = (int)floor($spend * $catalog->tournamentPrizePoolFraction());
         if ($prizePool < 0) {
