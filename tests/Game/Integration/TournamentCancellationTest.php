@@ -114,6 +114,13 @@ final class TournamentCancellationTest extends KernelTestCase
         self::assertNotEmpty($events);
         self::assertSame('tournament_canceled', $events[0]->getType());
 
+        $payload = $events[0]->getData();
+        self::assertIsArray($payload);
+        self::assertSame('canceled', $payload['outcome'] ?? null);
+        self::assertSame(0, $payload['participant_count'] ?? null);
+        self::assertSame(0, $payload['registered_count'] ?? null);
+        self::assertSame('insufficient_participants', $payload['reason'] ?? null);
+
         $tournamentRepo = $entityManager->getRepository(Tournament::class);
         $tournament     = $tournamentRepo->findOneBy(['requestEventId' => (int)$event->getId()]);
         self::assertInstanceOf(Tournament::class, $tournament);
