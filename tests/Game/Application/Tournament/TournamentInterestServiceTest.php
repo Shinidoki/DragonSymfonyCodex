@@ -131,6 +131,54 @@ final class TournamentInterestServiceTest extends TestCase
         self::assertSame(10, $committed[0]->getData()['tournament_id'] ?? null);
     }
 
+
+    public function testAppliesCooldownPenaltyWhenRecentlyCommitted(): void
+    {
+        $world = new World('seed-1');
+        $settlement = new Settlement($world, 3, 0);
+        $tournament = new Tournament($world, $settlement, 1, 3, 200, 100, 6, 10);
+        $this->setEntityId($tournament, 99);
+
+        $fighter = new Character($world, 'Fighter', Race::Human);
+        $fighter->setTilePosition(2, 0);
+        $fighter->addMoney(1);
+        $this->setEntityId($fighter, 7);
+
+        $recentCommit = new CharacterEvent(
+            world: $world,
+            character: $fighter,
+            type: 'tournament_interest_committed',
+            day: 0,
+            data: ['tournament_id' => 42],
+        );
+
+        $goal = new CharacterGoal($fighter);
+        $profile = new NpcProfile($fighter, NpcArchetype::Fighter);
+
+        $service = new TournamentInterestService(
+            $this->mockEntityManager([$tournament], [$recentCommit]),
+            $this->provider($this->economyCatalog(70)),
+        );
+
+        $events = $service->advanceDay(
+            world: $world,
+            worldDay: 1,
+            characters: [$fighter],
+            goalsByCharacterId: [7 => $goal],
+            npcProfilesByCharacterId: [7 => $profile],
+        );
+
+        $evaluated = array_values(array_filter($events, static fn (CharacterEvent $e): bool => $e->getType() === 'tournament_interest_evaluated'));
+        self::assertCount(1, $evaluated);
+        self::assertSame(-20, $evaluated[0]->getData()['factors']['cooldown_penalty'] ?? null);
+
+        self::assertCount(
+            0,
+            array_values(array_filter($events, static fn (CharacterEvent $e): bool => $e->getType() === 'tournament_interest_committed')),
+            'Cooldown penalty should lower score below commit threshold.',
+        );
+    }
+
     private function economyCatalog(int $threshold): EconomyCatalog
     {
         return new EconomyCatalog(
@@ -143,14 +191,22 @@ final class TournamentInterestServiceTest extends TestCase
         );
     }
 
-    /** @param list<Tournament> $tournaments */
-    private function mockEntityManager(array $tournaments): EntityManagerInterface
+    /**
+     * @param list<Tournament> $tournaments
+     * @param list<CharacterEvent> $recentEvents
+     */
+    private function mockEntityManager(array $tournaments, array $recentEvents = []): EntityManagerInterface
     {
-        $repo = $this->createMock(EntityRepository::class);
-        $repo->method('findBy')->willReturn($tournaments);
+        $tournamentRepo = $this->createMock(EntityRepository::class);
+        $tournamentRepo->method('findBy')->willReturn($tournaments);
+
+        $eventRepo = $this->createMock(EntityRepository::class);
+        $eventRepo->method('findBy')->willReturn($recentEvents);
 
         $em = $this->createMock(EntityManagerInterface::class);
-        $em->method('getRepository')->willReturn($repo);
+        $em->method('getRepository')->willReturnCallback(
+            static fn (string $class): EntityRepository => $class === CharacterEvent::class ? $eventRepo : $tournamentRepo,
+        );
 
         return $em;
     }
