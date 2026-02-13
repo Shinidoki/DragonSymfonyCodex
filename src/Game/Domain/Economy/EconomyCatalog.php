@@ -14,6 +14,8 @@ namespace App\Game\Domain\Economy;
  * @phpstan-type TournamentsDef array{min_spend:int,max_spend_fraction_of_treasury:float,prize_pool_fraction:float,duration_days:int,radius:TournamentRadiusDef,gains:TournamentGainsDef,tournament_feedback:TournamentFeedbackDef}
  * @phpstan-type TournamentInterestWeightsDef array{distance:int,prize_pool:int,archetype_bias:int,money_pressure:int,cooldown_penalty:int}
  * @phpstan-type TournamentInterestDef array{commit_threshold:int,weights:TournamentInterestWeightsDef}
+ * @phpstan-type MigrationPressureWeightsDef array{prosperity_gap:int,treasury_gap:int,crowding_gap:int}
+ * @phpstan-type MigrationPressureDef array{lookback_days:int,commit_threshold:int,move_cooldown_days:int,daily_move_cap:int,max_travel_distance:int,weights:MigrationPressureWeightsDef}
  */
 final readonly class EconomyCatalog
 {
@@ -30,6 +32,7 @@ final readonly class EconomyCatalog
         private array $thresholds,
         private array $tournaments = [],
         private array $tournamentInterest = [],
+        private array $migrationPressure = [],
     )
     {
     }
@@ -260,6 +263,46 @@ final readonly class EconomyCatalog
     public function tournamentInterestWeightCooldownPenalty(): int
     {
         return (int)($this->tournamentInterest['weights']['cooldown_penalty'] ?? 20);
+    }
+
+    public function migrationPressureLookbackDays(): int
+    {
+        return (int)($this->migrationPressure['lookback_days'] ?? 14);
+    }
+
+    public function migrationPressureCommitThreshold(): int
+    {
+        return (int)($this->migrationPressure['commit_threshold'] ?? 60);
+    }
+
+    public function migrationPressureMoveCooldownDays(): int
+    {
+        return (int)($this->migrationPressure['move_cooldown_days'] ?? 3);
+    }
+
+    public function migrationPressureDailyMoveCap(): int
+    {
+        return (int)($this->migrationPressure['daily_move_cap'] ?? 3);
+    }
+
+    public function migrationPressureMaxTravelDistance(): int
+    {
+        return (int)($this->migrationPressure['max_travel_distance'] ?? 12);
+    }
+
+    public function migrationPressureWeightProsperityGap(): int
+    {
+        return (int)($this->migrationPressure['weights']['prosperity_gap'] ?? 30);
+    }
+
+    public function migrationPressureWeightTreasuryGap(): int
+    {
+        return (int)($this->migrationPressure['weights']['treasury_gap'] ?? 20);
+    }
+
+    public function migrationPressureWeightCrowdingGap(): int
+    {
+        return (int)($this->migrationPressure['weights']['crowding_gap'] ?? 15);
     }
 
     /**
