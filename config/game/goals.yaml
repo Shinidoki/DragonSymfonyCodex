@@ -125,6 +125,14 @@ event_rules:
             fighter.become_strongest:
                 set_current_goal:
                     code: goal.participate_tournament
+    tournament_interest_committed:
+        from:
+            fighter.become_strongest:
+                set_current_goal:
+                    code: goal.participate_tournament
+            leader.lead_settlement:
+                set_current_goal:
+                    code: goal.participate_tournament
     money_low_employed:
         from:
             civilian.have_family:

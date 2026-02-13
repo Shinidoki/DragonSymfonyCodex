@@ -90,6 +90,9 @@ Gameplay runs through the overworld simulation and combat resolution flow.
 - Fights resolve in turn-based RPG combat encounters (no separate local tactical runtime).
 - Targeting model is basic: single-target and AoE only.
 - Events and combat outcomes are emitted as part of simulation/combat processing.
+- Tournament simulation now emits interest decision events for observability:
+  - `tournament_interest_evaluated`
+  - `tournament_interest_committed`
 - There is no separate local-zone runtime surface in this architecture.
 
 ## API (read-only)

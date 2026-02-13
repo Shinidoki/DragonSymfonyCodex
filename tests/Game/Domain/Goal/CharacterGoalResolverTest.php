@@ -10,6 +10,7 @@ use App\Game\Domain\Goal\CharacterGoalResolver;
 use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Race;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Yaml\Yaml;
 
 final class CharacterGoalResolverTest extends TestCase
 {
@@ -362,6 +363,18 @@ final class CharacterGoalResolverTest extends TestCase
 
         self::assertSame(3, $goal->getLastProcessedEventId());
         self::assertSame('goal.idle', $goal->getCurrentGoalCode());
+    }
+
+    public function testGoalsCatalogDefinesTournamentInterestCommitRule(): void
+    {
+        $config = Yaml::parseFile(__DIR__ . '/../../../../config/game/goals.yaml');
+
+        self::assertIsArray($config['event_rules']['tournament_interest_committed']['from'] ?? null);
+        self::assertArrayHasKey('fighter.become_strongest', $config['event_rules']['tournament_interest_committed']['from']);
+        self::assertSame(
+            'goal.participate_tournament',
+            $config['event_rules']['tournament_interest_committed']['from']['fighter.become_strongest']['set_current_goal']['code'] ?? null,
+        );
     }
 
     private function withId(int $id, CharacterEvent $event): CharacterEvent
