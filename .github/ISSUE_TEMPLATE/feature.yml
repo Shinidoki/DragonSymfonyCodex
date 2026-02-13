@@ -1,0 +1,123 @@
+name: Feature (AI-ready)
+description: Propose a new feature with enough detail for a coding AI to implement safely.
+title: "[Feature]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for opening a feature request.
+
+        This repository is typically implemented by a coding AI.
+        Please be specific and testable.
+
+        **Execution constraints**
+        - Work branch: `agent/shiniclaw-work`
+        - Do not push directly to `master`
+        - Use local Docker workflow (`make up`, `make test`, `make down`)
+
+  - type: input
+    id: goal
+    attributes:
+      label: Goal / Outcome
+      description: One-sentence target outcome.
+      placeholder: Add an admin page showing active world sessions.
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: What pain/problem exists today?
+      placeholder: Users cannot inspect active local sessions without using CLI commands.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposed-solution
+    attributes:
+      label: Proposed solution
+      description: Describe the desired implementation at a high level.
+      placeholder: Add /admin/local-sessions with filtering and pagination.
+    validations:
+      required: true
+
+  - type: textarea
+    id: in-scope
+    attributes:
+      label: In scope
+      description: Bullet list of what should be included.
+      placeholder: |
+        - New admin controller action
+        - Twig template for listing sessions
+        - Functional tests for access + rendering
+    validations:
+      required: true
+
+  - type: textarea
+    id: out-of-scope
+    attributes:
+      label: Out of scope (non-goals)
+      description: What should explicitly NOT be done in this issue?
+      placeholder: |
+        - No realtime websockets
+        - No UI redesign beyond minimal Bootstrap styling
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Use a checklist. Each item must be objectively verifiable.
+      placeholder: |
+        - [ ] Admin can open /admin/local-sessions
+        - [ ] Non-admin users are denied access
+        - [ ] List shows session id, world, actor count, status
+        - [ ] Tests pass in local workflow
+    validations:
+      required: true
+
+  - type: textarea
+    id: technical-notes
+    attributes:
+      label: Technical notes / constraints
+      description: Known constraints, architecture notes, migration concerns.
+      placeholder: |
+        Symfony 8, Doctrine ORM, Twig + Bootstrap frontend.
+        Keep changes compatible with current Docker-based local dev setup.
+
+  - type: textarea
+    id: files-likely
+    attributes:
+      label: Files/areas likely affected
+      description: Optional but helpful for faster implementation.
+      placeholder: |
+        - src/Controller/Admin/*
+        - templates/admin/*
+        - tests/Functional/*
+
+  - type: textarea
+    id: verification
+    attributes:
+      label: Verification steps
+      description: Commands/checks to confirm completion.
+      value: |
+        - `make test`
+        - If UI is touched: verify locally at `http://127.0.0.1:8087/`
+        - Add/adjust tests for changed behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: definition-of-done
+    attributes:
+      label: Definition of done
+      description: Final completion checklist.
+      placeholder: |
+        - [ ] Implementation matches scope and acceptance criteria
+        - [ ] Tests updated and passing
+        - [ ] No direct changes to master branch
+        - [ ] PR description includes summary + test evidence
+    validations:
+      required: true
