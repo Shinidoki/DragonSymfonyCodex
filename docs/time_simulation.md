@@ -112,25 +112,25 @@ During world map travel:
 
 ---
 
-## 5. Local Map (Micro Layer)
+## 5. Encounter Space (Micro Layer)
 
-Each world map tile can be entered as a **local map**.
+Each world map tile can be entered as a **encounter space**.
 
-### 5.1 Local Map Properties
+### 5.1 Encounter Space Properties
 
 * Grid-based (cells)
 * Size may vary per tile
 * Represents streets, fields, interiors, battlefields
 
-### 5.2 Local Map Time Rules
+### 5.2 Encounter Space Time Rules
 
-Inside a local map:
+Inside an encounter space:
 
 * Actions are resolved via **ticks**
 * Movement is cell-by-cell
 * NPCs near the player are fully simulated per tick
 
-The local map is where:
+The encounter space is where:
 
 * Exploration happens
 * Conversations occur
@@ -140,11 +140,11 @@ The local map is where:
 
 ## 6. Simulation Zones
 
-### 6.1 Active Zone (Tick Simulation)
+### 6.1 Active Encounter (Tick Simulation)
 
-The **Active Zone** includes:
+The **Active Encounter** includes:
 
-* The current local map
+* The current encounter space
 * All entities visible or directly interacting with the player
 
 Rules:
@@ -157,7 +157,7 @@ Rules:
 
 ### 6.2 Background Zone (Daily Simulation)
 
-Entities outside the Active Zone:
+Entities outside the Active Encounter:
 
 * Are simulated in **daily steps**
 * Resolve schedules and goals once per day
@@ -241,8 +241,8 @@ This preserves Dragon Ball–style combat:
 
 While in combat:
 
-* World time outside the local map is effectively paused
-* Only the Active Zone advances via ticks
+* World time outside the encounter space is effectively paused
+* Only the Active Encounter advances via ticks
 
 Once combat ends:
 
@@ -302,7 +302,7 @@ This model supports:
 
 * A tick represents a single action
 * World map movement consumes time based on travel method
-* Local maps operate on action-based ticks
+* Encounter spaces operate on action-based ticks
 * Combat is turn-based with speed-based multiple actions
 * NPCs are simulated at high or low fidelity depending on proximity
 * Time advances consistently and fairly across all systems

@@ -26,9 +26,9 @@ The universe is structured into **three spatial layers**, ordered from largest t
 1. **Universe**
 2. **Planet**
 3. **World Map Tile**
-4. **Local Map**
+4. **Encounter Space**
 
-Only the lowest layer (local map) operates at full tick-level detail.
+Only the lowest layer (encounter space) operates at full tick-level detail.
 
 ---
 
@@ -152,19 +152,19 @@ The player does not act tick-by-tick on the world map.
 
 ---
 
-## 6. Local Map Layer
+## 6. Encounter Space Layer
 
-### 6.1 Local Map Overview
+### 6.1 Encounter Space Overview
 
-Entering a world map tile transitions the player into a **local map**.
+Entering a world map tile transitions the player into a **encounter space**.
 
-A local map:
+A encounter space:
 
 * Is grid-based (cells)
 * Represents concrete, explorable space
 * Is where all tick-based simulation occurs
 
-Local maps may represent:
+Encounter spaces may represent:
 
 * City streets
 * Villages
@@ -174,15 +174,15 @@ Local maps may represent:
 
 ---
 
-### 6.2 Local Map Size & Variability
+### 6.2 Encounter Space Size & Variability
 
-Local map size:
+Encounter space size:
 
 * Is variable
 * Depends on tile type and context
 * Is designed for tactical play
 
-Local maps are intentionally limited in scope to support:
+Encounter spaces are intentionally limited in scope to support:
 
 * Turn-based combat
 * NPC interaction
@@ -192,11 +192,11 @@ Local maps are intentionally limited in scope to support:
 
 ## 7. Simulation Zones & Fidelity
 
-### 7.1 Active Zone
+### 7.1 Active Encounter
 
-The **Active Zone** is the current local map.
+The **Active Encounter** is the current encounter space.
 
-Entities in the Active Zone:
+Entities in the Active Encounter:
 
 * Are simulated **per tick**
 * Act using the one-action-per-tick rule
@@ -212,7 +212,7 @@ This includes:
 
 ### 7.2 Background Zone
 
-Entities outside the Active Zone:
+Entities outside the Active Encounter:
 
 * Are simulated in **daily resolution**
 * Follow schedules and long-term goals
@@ -227,21 +227,21 @@ This applies:
 
 ## 8. Transitions Between Layers
 
-### 8.1 World Map → Local Map
+### 8.1 World Map → Encounter Space
 
 When entering a tile:
 
 * Time stops advancing in world-map units
-* The local map is instantiated
-* Relevant NPCs are loaded into the Active Zone
+* The encounter space is instantiated
+* Relevant NPCs are loaded into the Active Encounter
 
 NPCs are fast-forwarded to the current time before activation.
 
 ---
 
-### 8.2 Local Map → World Map
+### 8.2 Encounter Space → World Map
 
-When leaving a local map:
+When leaving an encounter space:
 
 * NPCs are summarized into:
 
@@ -262,7 +262,7 @@ Encounters may occur:
 
 * During world map travel
 * Upon entering a tile
-* While exploring a local map
+* While exploring an encounter space
 * Due to NPC goals (hunting, patrols, ambushes)
 
 ---
@@ -271,7 +271,7 @@ Encounters may occur:
 
 Encounters:
 
-* Transition to a local map if combat or interaction occurs
+* Transition to an encounter space if combat or interaction occurs
 * May be avoided, escalated, or resolved socially
 * Are influenced by:
 
@@ -279,7 +279,7 @@ Encounters:
     * Reputation
     * Awareness
 
-Combat always occurs on a local map.
+Combat always occurs on an encounter space.
 
 ---
 
@@ -300,7 +300,7 @@ Once combat ends, normal simulation resumes.
 NPCs:
 
 * Travel across world map tiles
-* Enter and leave local maps
+* Enter and leave encounter spaces
 * Act based on goals and schedules
 * Cause changes to tiles (damage, destruction, protection)
 
@@ -354,8 +354,8 @@ These belong to later layers.
 * The universe contains multiple planets
 * Each planet has its own world map
 * World maps handle scale and time
-* Local maps handle detail and actions
+* Encounter spaces handle detail and actions
 * Simulation fidelity increases with proximity
 * The system is expandable without redesign
 
-> **Scale lives on the world map; stories happen on the local map.**
+> **Scale lives on the world map; stories happen on the encounter space.**
