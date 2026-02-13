@@ -371,9 +371,25 @@ final class CharacterGoalResolverTest extends TestCase
 
         self::assertIsArray($config['event_rules']['tournament_interest_committed']['from'] ?? null);
         self::assertArrayHasKey('fighter.become_strongest', $config['event_rules']['tournament_interest_committed']['from']);
+        self::assertArrayHasKey('leader.lead_settlement', $config['event_rules']['tournament_interest_committed']['from']);
+
         self::assertSame(
             'goal.participate_tournament',
             $config['event_rules']['tournament_interest_committed']['from']['fighter.become_strongest']['set_current_goal']['code'] ?? null,
+        );
+        self::assertSame(
+            'goal.participate_tournament',
+            $config['event_rules']['tournament_interest_committed']['from']['leader.lead_settlement']['set_current_goal']['code'] ?? null,
+        );
+
+        $leaderPool = $config['life_goals']['leader.lead_settlement']['current_goal_pool'] ?? [];
+        self::assertContains(
+            'goal.participate_tournament',
+            array_values(array_filter(array_map(
+                static fn (mixed $item): mixed => is_array($item) ? ($item['code'] ?? null) : null,
+                is_array($leaderPool) ? $leaderPool : [],
+            ))),
+            'leader.lead_settlement must include goal.participate_tournament in current_goal_pool for compatibility checks.',
         );
     }
 

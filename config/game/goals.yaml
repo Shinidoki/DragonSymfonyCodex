@@ -50,6 +50,8 @@ life_goals:
                 weight: 2
             -   code: goal.organize_tournament
                 weight: 1
+            -   code: goal.participate_tournament
+                weight: 1
             -   code: goal.earn_money
                 weight: 1
 
