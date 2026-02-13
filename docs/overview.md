@@ -121,6 +121,10 @@ The project is designed to:
 
 The initial development focus is on **backend systems and APIs**, ensuring a solid foundation before introducing visual or interactive interfaces.
 
+### Current simulation note
+
+Settlement migration pressure is driven by simulation events. When NPC relocation pressure crosses threshold, the loop emits `settlement_migration_committed`; goal resolution can then switch affected characters to `goal.find_job` with explicit destination coordinates (`target_x`, `target_y`).
+
 ---
 
 ## 9. Summary
