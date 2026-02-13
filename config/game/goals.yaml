@@ -122,11 +122,6 @@ npc_life_goals:
             weight: 1
 
 event_rules:
-    tournament_announced:
-        from:
-            fighter.become_strongest:
-                set_current_goal:
-                    code: goal.participate_tournament
     tournament_interest_committed:
         from:
             fighter.become_strongest:

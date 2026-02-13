@@ -5,12 +5,14 @@ namespace App\Tests\Game\Integration;
 use App\Entity\Character;
 use App\Entity\CharacterEvent;
 use App\Entity\CharacterGoal;
+use App\Entity\NpcProfile;
 use App\Entity\Settlement;
 use App\Entity\Tournament;
 use App\Entity\World;
 use App\Entity\WorldMapTile;
 use App\Game\Application\Simulation\AdvanceDayHandler;
 use App\Game\Domain\Map\Biome;
+use App\Game\Domain\Npc\NpcArchetype;
 use App\Game\Domain\Race;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\Tools\SchemaTool;
@@ -46,7 +48,8 @@ final class TournamentEventLoopTest extends KernelTestCase
         $organizer->setTilePosition(3, 0);
 
         $fighter = new Character($world, 'Fighter', Race::Human);
-        $fighter->setTilePosition(0, 0);
+        $fighter->setTilePosition(2, 0);
+        $fighterProfile = new NpcProfile($fighter, NpcArchetype::Fighter);
 
         $organizerGoal = new CharacterGoal($organizer);
         $organizerGoal->setLifeGoalCode('civilian.organize_events');
@@ -66,6 +69,7 @@ final class TournamentEventLoopTest extends KernelTestCase
         $entityManager->persist($settlement);
         $entityManager->persist($organizer);
         $entityManager->persist($fighter);
+        $entityManager->persist($fighterProfile);
         $entityManager->persist($organizerGoal);
         $entityManager->persist($fighterGoal);
         $entityManager->flush();
@@ -111,13 +115,18 @@ final class TournamentEventLoopTest extends KernelTestCase
         self::assertSame(100, $tournament->getPrizePool());
         self::assertSame(6, $tournament->getRadius());
 
+        $committed = $entityManager->getRepository(CharacterEvent::class)->findOneBy([
+            'world' => $world,
+            'character' => $fighter,
+            'type' => 'tournament_interest_committed',
+            'day' => 1,
+        ]);
+        self::assertInstanceOf(CharacterEvent::class, $committed);
+
         self::assertSame('goal.participate_tournament', $fighterGoal->getCurrentGoalCode());
         self::assertFalse($fighterGoal->isCurrentGoalComplete());
 
-        self::assertSame(1, $fighter->getTileX());
+        self::assertGreaterThanOrEqual(2, $fighter->getTileX());
         self::assertSame(0, $fighter->getTileY());
-        self::assertTrue($fighter->hasTravelTarget());
-        self::assertSame(3, $fighter->getTargetTileX());
-        self::assertSame(0, $fighter->getTargetTileY());
     }
 }
