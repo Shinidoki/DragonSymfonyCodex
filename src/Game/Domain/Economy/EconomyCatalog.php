@@ -10,7 +10,8 @@ namespace App\Game\Domain\Economy;
  * @phpstan-type ThresholdsDef array{money_low_employed:int,money_low_unemployed:int}
  * @phpstan-type TournamentRadiusDef array{base:int,per_spend:int,max:int}
  * @phpstan-type TournamentGainsDef array{fame_base:int,fame_per_spend:int,prosperity_base:int,prosperity_per_spend:int,per_participant_fame:int}
- * @phpstan-type TournamentsDef array{min_spend:int,max_spend_fraction_of_treasury:float,prize_pool_fraction:float,duration_days:int,radius:TournamentRadiusDef,gains:TournamentGainsDef}
+ * @phpstan-type TournamentFeedbackDef array{lookback_days:int,sample_size_min:int,spend_multiplier_step:float,radius_delta_step:int,spend_multiplier_min:float,spend_multiplier_max:float,radius_delta_min:int,radius_delta_max:int}
+ * @phpstan-type TournamentsDef array{min_spend:int,max_spend_fraction_of_treasury:float,prize_pool_fraction:float,duration_days:int,radius:TournamentRadiusDef,gains:TournamentGainsDef,tournament_feedback:TournamentFeedbackDef}
  * @phpstan-type TournamentInterestWeightsDef array{distance:int,prize_pool:int,archetype_bias:int,money_pressure:int,cooldown_penalty:int}
  * @phpstan-type TournamentInterestDef array{commit_threshold:int,weights:TournamentInterestWeightsDef}
  */
@@ -189,6 +190,46 @@ final readonly class EconomyCatalog
     public function tournamentPerParticipantFame(): int
     {
         return (int)($this->tournaments['gains']['per_participant_fame'] ?? 0);
+    }
+
+    public function tournamentFeedbackLookbackDays(): int
+    {
+        return (int)($this->tournaments['tournament_feedback']['lookback_days'] ?? 14);
+    }
+
+    public function tournamentFeedbackSampleSizeMin(): int
+    {
+        return (int)($this->tournaments['tournament_feedback']['sample_size_min'] ?? 2);
+    }
+
+    public function tournamentFeedbackSpendMultiplierStep(): float
+    {
+        return (float)($this->tournaments['tournament_feedback']['spend_multiplier_step'] ?? 0.1);
+    }
+
+    public function tournamentFeedbackRadiusDeltaStep(): int
+    {
+        return (int)($this->tournaments['tournament_feedback']['radius_delta_step'] ?? 1);
+    }
+
+    public function tournamentFeedbackSpendMultiplierMin(): float
+    {
+        return (float)($this->tournaments['tournament_feedback']['spend_multiplier_min'] ?? 0.7);
+    }
+
+    public function tournamentFeedbackSpendMultiplierMax(): float
+    {
+        return (float)($this->tournaments['tournament_feedback']['spend_multiplier_max'] ?? 1.3);
+    }
+
+    public function tournamentFeedbackRadiusDeltaMin(): int
+    {
+        return (int)($this->tournaments['tournament_feedback']['radius_delta_min'] ?? -3);
+    }
+
+    public function tournamentFeedbackRadiusDeltaMax(): int
+    {
+        return (int)($this->tournaments['tournament_feedback']['radius_delta_max'] ?? 3);
     }
 
     public function tournamentInterestCommitThreshold(): int

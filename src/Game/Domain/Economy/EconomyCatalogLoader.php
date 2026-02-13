@@ -209,6 +209,55 @@ final class EconomyCatalogLoader
             }
         }
 
+        $feedback = $tournaments['tournament_feedback'] ?? [];
+        if (!is_array($feedback)) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback must be a mapping when provided.');
+        }
+
+        $feedbackLookbackDays = $feedback['lookback_days'] ?? 14;
+        if (!is_int($feedbackLookbackDays) || $feedbackLookbackDays < 1) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.lookback_days must be an integer >= 1.');
+        }
+
+        $feedbackSampleSizeMin = $feedback['sample_size_min'] ?? 2;
+        if (!is_int($feedbackSampleSizeMin) || $feedbackSampleSizeMin < 1) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.sample_size_min must be an integer >= 1.');
+        }
+
+        $feedbackSpendMultiplierStep = $feedback['spend_multiplier_step'] ?? 0.1;
+        if ((!is_float($feedbackSpendMultiplierStep) && !is_int($feedbackSpendMultiplierStep)) || $feedbackSpendMultiplierStep < 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_step must be a number >= 0.');
+        }
+
+        $feedbackRadiusDeltaStep = $feedback['radius_delta_step'] ?? 1;
+        if (!is_int($feedbackRadiusDeltaStep) || $feedbackRadiusDeltaStep < 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_step must be an integer >= 0.');
+        }
+
+        $feedbackSpendMultiplierMin = $feedback['spend_multiplier_min'] ?? 0.7;
+        $feedbackSpendMultiplierMax = $feedback['spend_multiplier_max'] ?? 1.3;
+        if ((!is_float($feedbackSpendMultiplierMin) && !is_int($feedbackSpendMultiplierMin)) || $feedbackSpendMultiplierMin <= 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_min must be a number > 0.');
+        }
+        if ((!is_float($feedbackSpendMultiplierMax) && !is_int($feedbackSpendMultiplierMax)) || $feedbackSpendMultiplierMax <= 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_max must be a number > 0.');
+        }
+        if ((float)$feedbackSpendMultiplierMin > (float)$feedbackSpendMultiplierMax) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_min must be <= spend_multiplier_max.');
+        }
+
+        $feedbackRadiusDeltaMin = $feedback['radius_delta_min'] ?? -3;
+        $feedbackRadiusDeltaMax = $feedback['radius_delta_max'] ?? 3;
+        if (!is_int($feedbackRadiusDeltaMin)) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_min must be an integer.');
+        }
+        if (!is_int($feedbackRadiusDeltaMax)) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_max must be an integer.');
+        }
+        if ($feedbackRadiusDeltaMin > $feedbackRadiusDeltaMax) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_min must be <= radius_delta_max.');
+        }
+
         $tournamentInterest = $raw['tournament_interest'] ?? [];
         if (!is_array($tournamentInterest)) {
             throw new \InvalidArgumentException('tournament_interest must be a mapping when provided.');
@@ -274,6 +323,16 @@ final class EconomyCatalogLoader
                     'prosperity_base'      => $prosBase,
                     'prosperity_per_spend' => $prosPerSpend,
                     'per_participant_fame' => $perParticipantFame,
+                ],
+                'tournament_feedback'             => [
+                    'lookback_days'          => $feedbackLookbackDays,
+                    'sample_size_min'        => $feedbackSampleSizeMin,
+                    'spend_multiplier_step'  => (float)$feedbackSpendMultiplierStep,
+                    'radius_delta_step'      => $feedbackRadiusDeltaStep,
+                    'spend_multiplier_min'   => (float)$feedbackSpendMultiplierMin,
+                    'spend_multiplier_max'   => (float)$feedbackSpendMultiplierMax,
+                    'radius_delta_min'       => $feedbackRadiusDeltaMin,
+                    'radius_delta_max'       => $feedbackRadiusDeltaMax,
                 ],
             ],
             tournamentInterest: [
