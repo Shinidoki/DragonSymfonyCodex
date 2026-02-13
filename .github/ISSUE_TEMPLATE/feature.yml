@@ -29,7 +29,7 @@ body:
     attributes:
       label: Problem to solve
       description: What pain/problem exists today?
-      placeholder: Users cannot inspect active local sessions without using CLI commands.
+      placeholder: Admin users cannot inspect current world activity from the UI.
     validations:
       required: true
 
@@ -38,7 +38,7 @@ body:
     attributes:
       label: Proposed solution
       description: Describe the desired implementation at a high level.
-      placeholder: Add /admin/local-sessions with filtering and pagination.
+      placeholder: Add /admin/world-activity with filtering and pagination.
     validations:
       required: true
 
@@ -71,9 +71,9 @@ body:
       label: Acceptance criteria
       description: Use a checklist. Each item must be objectively verifiable.
       placeholder: |
-        - [ ] Admin can open /admin/local-sessions
+        - [ ] Admin can open /admin/world-activity
         - [ ] Non-admin users are denied access
-        - [ ] List shows session id, world, actor count, status
+        - [ ] List shows character, world, and current simulation state
         - [ ] Tests pass in local workflow
     validations:
       required: true
