@@ -41,12 +41,7 @@ final class FindJobGoalHandler implements CurrentGoalHandlerInterface
         $target = null;
         if (is_int($targetX) && is_int($targetY)) {
             if ($targetX >= 0 && $targetY >= 0 && ($width <= 0 || $targetX < $width) && ($height <= 0 || $targetY < $height)) {
-                foreach ($settlements as $s) {
-                    if ($s->x === $targetX && $s->y === $targetY) {
-                        $target = $s;
-                        break;
-                    }
-                }
+                $target = new TileCoord($targetX, $targetY);
             }
         }
 

@@ -53,5 +53,25 @@ final class FindJobGoalHandlerTest extends TestCase
         self::assertSame(DailyActivity::Rest, $step->plan->activity);
         self::assertTrue($step->completed);
     }
+
+    public function testKeepsExplicitMigrationTargetEvenWhenItIsNotNearestKnownSettlement(): void
+    {
+        $world = new World('seed-1');
+        $world->setMapSize(10, 10);
+
+        $character = new Character($world, 'NPC', Race::Human);
+        $character->setTilePosition(0, 0);
+
+        $handler = new FindJobGoalHandler();
+        $context = new GoalContext(settlementTiles: [new TileCoord(1, 0), new TileCoord(2, 0)]);
+
+        $step = $handler->step($character, $world, ['target_x' => 8, 'target_y' => 8], $context);
+
+        self::assertSame(DailyActivity::Travel, $step->plan->activity);
+        self::assertFalse($step->completed);
+        self::assertSame(['target_x' => 8, 'target_y' => 8], $step->data);
+        self::assertSame(8, $step->plan->travelTarget?->x);
+        self::assertSame(8, $step->plan->travelTarget?->y);
+    }
 }
 

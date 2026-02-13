@@ -393,6 +393,21 @@ final class CharacterGoalResolverTest extends TestCase
         );
     }
 
+    public function testGoalsCatalogDefinesSettlementMigrationCommitRule(): void
+    {
+        $config = Yaml::parseFile(__DIR__ . '/../../../../config/game/goals.yaml');
+
+        self::assertIsArray($config['event_rules']['settlement_migration_committed']['from'] ?? null);
+
+        foreach (['civilian.have_family', 'civilian.organize_events', 'fighter.become_strongest', 'wanderer.see_the_world'] as $lifeGoalCode) {
+            self::assertSame(
+                'goal.find_job',
+                $config['event_rules']['settlement_migration_committed']['from'][$lifeGoalCode]['set_current_goal']['code'] ?? null,
+                sprintf('Expected %s to map settlement_migration_committed to goal.find_job', $lifeGoalCode),
+            );
+        }
+    }
+
     private function withId(int $id, CharacterEvent $event): CharacterEvent
     {
         $ref = new \ReflectionProperty(CharacterEvent::class, 'id');
