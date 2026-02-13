@@ -3,10 +3,12 @@
 namespace App\Tests\Game\Application\Simulation;
 
 use App\Entity\Character;
+use App\Entity\CharacterEvent;
 use App\Entity\CharacterGoal;
 use App\Entity\World;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Simulation\AdvanceDayHandler;
+use App\Game\Application\Tournament\TournamentInterestService;
 use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Goal\GoalPlanner;
 use App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler;
@@ -215,6 +217,99 @@ final class AdvanceDayHandlerTest extends TestCase
         self::assertSame(0, $character->getTileY());
         self::assertFalse($character->hasTravelTarget());
         self::assertSame($beforeStrength, $character->getStrength());
+    }
+
+    public function testAdvancePersistsTournamentInterestEventsWhenServiceConfigured(): void
+    {
+        $world = new World('seed-1');
+        $character = new Character($world, 'Gohan', Race::Human);
+        $character->setTilePosition(2, 0);
+        $character->addMoney(1);
+        $this->setEntityId($character, 7);
+
+        $settlement = new \App\Entity\Settlement($world, 3, 0);
+        $tournament = new \App\Entity\Tournament($world, $settlement, 1, 3, 200, 100, 6, 10);
+        $this->setEntityId($tournament, 99);
+
+        $worldRepository = $this->createMock(WorldRepository::class);
+        $worldRepository->method('find')->with(1)->willReturn($world);
+
+        $characterRepository = $this->createMock(CharacterRepository::class);
+        $characterRepository->method('findBy')->willReturn([$character]);
+
+        $profile = new \App\Entity\NpcProfile($character, \App\Game\Domain\Npc\NpcArchetype::Fighter);
+        $npcProfiles = $this->createMock(NpcProfileRepository::class);
+        $npcProfiles->method('findByWorld')->willReturn([$profile]);
+
+        $tiles = $this->createMock(WorldMapTileRepository::class);
+        $tiles->method('findBy')->willReturn([]);
+
+        $repo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $repo->method('findBy')->willReturn([$tournament]);
+
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('getRepository')->willReturn($repo);
+        $persisted = [];
+        $entityManager->method('persist')
+            ->willReturnCallback(static function (object $event) use (&$persisted): void {
+                $persisted[] = $event;
+            });
+        $entityManager->expects(self::exactly(2))->method('flush');
+
+        $clock = new SimulationClock(new TrainingGrowthService());
+
+        $characterGoals = $this->createMock(CharacterGoalRepository::class);
+        $characterGoals->method('findByWorld')->willReturn([]);
+
+        $characterEvents = $this->createMock(CharacterEventRepository::class);
+        $characterEvents->method('findByWorldUpToDay')->willReturn([]);
+
+        $goalProvider = $this->createMock(GoalCatalogProviderInterface::class);
+        $goalProvider->method('get')->willReturn(new GoalCatalog([], [], [], []));
+
+        $catalog = new \App\Game\Domain\Economy\EconomyCatalog(
+            jobs: [],
+            employmentPools: [],
+            settlement: ['wage_pool_rate' => 0.7, 'tax_rate' => 0.2, 'production' => ['per_work_unit_base' => 10, 'per_work_unit_prosperity_mult' => 1, 'randomness_pct' => 0.1]],
+            thresholds: ['money_low_employed' => 10, 'money_low_unemployed' => 5],
+            tournaments: ['min_spend' => 50, 'max_spend_fraction_of_treasury' => 0.3, 'prize_pool_fraction' => 0.5, 'duration_days' => 2, 'radius' => ['base' => 2, 'per_spend' => 50, 'max' => 20], 'gains' => ['fame_base' => 1, 'fame_per_spend' => 100, 'prosperity_base' => 1, 'prosperity_per_spend' => 150, 'per_participant_fame' => 1]],
+            tournamentInterest: ['commit_threshold' => 60, 'weights' => ['distance' => 30, 'prize_pool' => 25, 'archetype_bias' => 20, 'money_pressure' => 15, 'cooldown_penalty' => 20]],
+        );
+
+        $provider = new class ($catalog) implements \App\Game\Application\Economy\EconomyCatalogProviderInterface {
+            public function __construct(private readonly \App\Game\Domain\Economy\EconomyCatalog $catalog)
+            {
+            }
+
+            public function get(): \App\Game\Domain\Economy\EconomyCatalog
+            {
+                return $this->catalog;
+            }
+        };
+
+        $interestService = new TournamentInterestService($entityManager, $provider);
+
+        $handler = new AdvanceDayHandler(
+            $worldRepository,
+            $characterRepository,
+            $npcProfiles,
+            $tiles,
+            $clock,
+            $entityManager,
+            $characterGoals,
+            $characterEvents,
+            $goalProvider,
+            tournamentInterestService: $interestService,
+        );
+
+        $handler->advance(1, 1);
+
+        self::assertTrue(
+            (bool) array_filter(
+                $persisted,
+                static fn (object $event): bool => $event instanceof CharacterEvent && $event->getType() === 'tournament_interest_evaluated',
+            ),
+        );
     }
 
     private function setEntityId(object $entity, int $id): void

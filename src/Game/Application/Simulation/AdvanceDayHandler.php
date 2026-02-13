@@ -11,6 +11,7 @@ use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
 use App\Game\Application\Settlement\SettlementProjectLifecycleService;
+use App\Game\Application\Tournament\TournamentInterestService;
 use App\Game\Application\Tournament\TournamentLifecycleService;
 use App\Game\Domain\Economy\EconomyCatalog;
 use App\Game\Domain\Map\TileCoord;
@@ -51,6 +52,7 @@ final class AdvanceDayHandler
         private readonly ?ProjectCatalogProviderInterface   $projectCatalogProvider = null,
         private readonly ?SettlementSimulationContextBuilder $settlementContextBuilder = null,
         private readonly ?DojoLifecycleService               $dojoLifecycle = null,
+        private readonly ?TournamentInterestService          $tournamentInterestService = null,
     )
     {
     }
@@ -173,6 +175,22 @@ final class AdvanceDayHandler
                     );
 
                     foreach ($tournamentEvents as $event) {
+                        $this->entityManager->persist($event);
+                    }
+
+                    $this->entityManager->flush();
+                }
+
+                if ($this->tournamentInterestService instanceof TournamentInterestService) {
+                    $interestEvents = $this->tournamentInterestService->advanceDay(
+                        world: $world,
+                        worldDay: $world->getCurrentDay(),
+                        characters: $characters,
+                        goalsByCharacterId: $goalsByCharacterId,
+                        npcProfilesByCharacterId: $profilesByCharacterId,
+                    );
+
+                    foreach ($interestEvents as $event) {
                         $this->entityManager->persist($event);
                     }
 
