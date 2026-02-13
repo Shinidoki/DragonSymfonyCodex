@@ -195,6 +195,20 @@ final class AdvanceDayHandler
                     }
 
                     $this->entityManager->flush();
+
+                    if (
+                        $this->tournamentLifecycle instanceof TournamentLifecycleService
+                        && $economyCatalog instanceof EconomyCatalog
+                        && $settlementEntities !== []
+                    ) {
+                        $this->tournamentLifecycle->registerParticipantsForDay(
+                            world: $world,
+                            worldDay: $world->getCurrentDay(),
+                            characters: $characters,
+                            goalsByCharacterId: $goalsByCharacterId,
+                        );
+                        $this->entityManager->flush();
+                    }
                 }
 
                 if (
