@@ -69,6 +69,9 @@ final class TournamentInterestService
                 continue;
             }
 
+            /** @var array{score:int,distance:int,tournament_id:int,data:array<string,mixed>}|null $bestCommit */
+            $bestCommit = null;
+
             foreach ($tournaments as $tournament) {
                 $settlement = $tournament->getSettlement();
                 $distance = abs($character->getTileX() - $settlement->getX()) + abs($character->getTileY() - $settlement->getY());
@@ -106,9 +109,29 @@ final class TournamentInterestService
 
                 $events[] = new CharacterEvent($world, $character, 'tournament_interest_evaluated', $worldDay, $baseData);
 
-                if ($decision === 'committed') {
-                    $events[] = new CharacterEvent($world, $character, 'tournament_interest_committed', $worldDay, $baseData);
+                if ($decision !== 'committed') {
+                    continue;
                 }
+
+                $candidate = [
+                    'score' => $score,
+                    'distance' => $distance,
+                    'tournament_id' => (int)($tournament->getId() ?? PHP_INT_MAX),
+                    'data' => $baseData,
+                ];
+
+                if ($bestCommit === null
+                    || $candidate['score'] > $bestCommit['score']
+                    || ($candidate['score'] === $bestCommit['score'] && $candidate['distance'] < $bestCommit['distance'])
+                    || ($candidate['score'] === $bestCommit['score'] && $candidate['distance'] === $bestCommit['distance'] && $candidate['tournament_id'] < $bestCommit['tournament_id'])) {
+                    $bestCommit = $candidate;
+                }
+            }
+
+            if ($bestCommit !== null) {
+                /** @var array<string,mixed> $data */
+                $data = $bestCommit['data'];
+                $events[] = new CharacterEvent($world, $character, 'tournament_interest_committed', $worldDay, $data);
             }
         }
 

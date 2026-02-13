@@ -90,6 +90,47 @@ final class TournamentInterestServiceTest extends TestCase
         self::assertSame('registration_closed', $evaluated[0]->getData()['reason_code'] ?? null);
     }
 
+    public function testCommitsToOnlyOneTournamentWhenMultipleQualify(): void
+    {
+        $world = new World('seed-1');
+
+        $nearSettlement = new Settlement($world, 2, 0);
+        $nearTournament = new Tournament($world, $nearSettlement, 1, 3, 200, 100, 6, 10);
+        $this->setEntityId($nearTournament, 10);
+
+        $farSettlement = new Settlement($world, 7, 0);
+        $farTournament = new Tournament($world, $farSettlement, 1, 3, 200, 100, 10, 11);
+        $this->setEntityId($farTournament, 11);
+
+        $fighter = new Character($world, 'Fighter', Race::Human);
+        $fighter->setTilePosition(2, 0);
+        $fighter->addMoney(1);
+        $this->setEntityId($fighter, 7);
+
+        $goal = new CharacterGoal($fighter);
+        $profile = new NpcProfile($fighter, NpcArchetype::Fighter);
+
+        $service = new TournamentInterestService(
+            $this->mockEntityManager([$nearTournament, $farTournament]),
+            $this->provider($this->economyCatalog(30)),
+        );
+
+        $events = $service->advanceDay(
+            world: $world,
+            worldDay: 1,
+            characters: [$fighter],
+            goalsByCharacterId: [7 => $goal],
+            npcProfilesByCharacterId: [7 => $profile],
+        );
+
+        $evaluated = array_values(array_filter($events, static fn (CharacterEvent $e): bool => $e->getType() === 'tournament_interest_evaluated'));
+        $committed = array_values(array_filter($events, static fn (CharacterEvent $e): bool => $e->getType() === 'tournament_interest_committed'));
+
+        self::assertCount(2, $evaluated);
+        self::assertCount(1, $committed);
+        self::assertSame(10, $committed[0]->getData()['tournament_id'] ?? null);
+    }
+
     private function economyCatalog(int $threshold): EconomyCatalog
     {
         return new EconomyCatalog(
