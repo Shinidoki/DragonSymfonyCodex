@@ -6,9 +6,11 @@ namespace App\Game\Application\Settlement;
 
 use App\Entity\Character;
 use App\Entity\CharacterEvent;
+use App\Entity\CharacterGoal;
 use App\Entity\Settlement;
 use App\Entity\World;
 use App\Game\Application\Economy\EconomyCatalogProviderInterface;
+use App\Game\Domain\Goal\GoalCatalog;
 use Doctrine\ORM\EntityManagerInterface;
 
 final class SettlementMigrationPressureService
@@ -25,7 +27,10 @@ final class SettlementMigrationPressureService
      *
      * @return list<CharacterEvent>
      */
-    public function advanceDay(World $world, int $worldDay, array $characters, array $settlements): array
+    /**
+     * @param array<int,CharacterGoal> $goalsByCharacterId
+     */
+    public function advanceDay(World $world, int $worldDay, array $characters, array $settlements, array $goalsByCharacterId = [], ?GoalCatalog $goalCatalog = null): array
     {
         if ($worldDay < 0) {
             throw new \InvalidArgumentException('worldDay must be >= 0.');
@@ -64,6 +69,10 @@ final class SettlementMigrationPressureService
             }
 
             if ($character->isEmployed()) {
+                continue;
+            }
+
+            if ($this->hasNonInterruptibleCurrentGoal($character, $goalsByCharacterId, $goalCatalog)) {
                 continue;
             }
 
@@ -160,6 +169,33 @@ final class SettlementMigrationPressureService
         }
 
         return $events;
+    }
+
+    /**
+     * @param array<int,CharacterGoal> $goalsByCharacterId
+     */
+    private function hasNonInterruptibleCurrentGoal(Character $character, array $goalsByCharacterId, ?GoalCatalog $goalCatalog): bool
+    {
+        if (!$goalCatalog instanceof GoalCatalog) {
+            return false;
+        }
+
+        $characterId = $character->getId();
+        if (!is_int($characterId)) {
+            return false;
+        }
+
+        $goal = $goalsByCharacterId[$characterId] ?? null;
+        if (!$goal instanceof CharacterGoal) {
+            return false;
+        }
+
+        $currentGoalCode = $goal->getCurrentGoalCode();
+        if (!is_string($currentGoalCode) || $currentGoalCode === '' || $goal->isCurrentGoalComplete()) {
+            return false;
+        }
+
+        return !$goalCatalog->currentGoalInterruptible($currentGoalCode);
     }
 
     /** @param array<int,int> $latestMigrationDayByCharacterId */

@@ -223,6 +223,8 @@ final class AdvanceDayHandler
                         worldDay: $world->getCurrentDay(),
                         characters: $characters,
                         settlements: $settlementEntities,
+                        goalsByCharacterId: $goalsByCharacterId,
+                        goalCatalog: $catalog,
                     );
 
                     foreach ($migrationEvents as $event) {

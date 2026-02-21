@@ -6,11 +6,13 @@ namespace App\Tests\Game\Application\Settlement;
 
 use App\Entity\Character;
 use App\Entity\CharacterEvent;
+use App\Entity\CharacterGoal;
 use App\Entity\Settlement;
 use App\Entity\World;
 use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Application\Settlement\SettlementMigrationPressureService;
 use App\Game\Domain\Economy\EconomyCatalog;
+use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Race;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
@@ -176,6 +178,53 @@ final class SettlementMigrationPressureServiceTest extends TestCase
         );
 
         $events = $service->advanceDay($world, 10, [$lowPressureCharacter, $highPressureCharacter], [$sourceLow, $sourceHigh, $destination]);
+
+        self::assertCount(1, $events);
+        self::assertSame(8, $events[0]->getData()['character_id'] ?? null);
+    }
+
+    public function testSkipsCharactersWithNonInterruptibleCurrentGoals(): void
+    {
+        $world = new World('seed-1');
+
+        $source = new Settlement($world, 1, 1);
+        $source->setProsperity(20);
+        $destination = new Settlement($world, 3, 2);
+        $destination->setProsperity(90);
+
+        $blocked = new Character($world, 'Blocked', Race::Human);
+        $blocked->setTilePosition(1, 1);
+        $this->setEntityId($blocked, 7);
+
+        $eligible = new Character($world, 'Eligible', Race::Human);
+        $eligible->setTilePosition(1, 1);
+        $this->setEntityId($eligible, 8);
+
+        $blockedGoal = new CharacterGoal($blocked);
+        $blockedGoal->setCurrentGoalCode('goal.train_in_dojo');
+        $blockedGoal->setCurrentGoalComplete(false);
+
+        $service = new SettlementMigrationPressureService(
+            entityManager: $this->mockEntityManager([]),
+            economyCatalogProvider: $this->provider($this->economyCatalog([
+                'daily_move_cap' => 1,
+                'commit_threshold' => 1,
+            ])),
+        );
+
+        $events = $service->advanceDay(
+            world: $world,
+            worldDay: 10,
+            characters: [$blocked, $eligible],
+            settlements: [$source, $destination],
+            goalsByCharacterId: [7 => $blockedGoal],
+            goalCatalog: new GoalCatalog(
+                lifeGoals: [],
+                currentGoals: [
+                    'goal.train_in_dojo' => ['interruptible' => false],
+                ],
+            ),
+        );
 
         self::assertCount(1, $events);
         self::assertSame(8, $events[0]->getData()['character_id'] ?? null);

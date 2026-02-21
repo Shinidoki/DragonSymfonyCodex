@@ -106,4 +106,81 @@ final class SettlementMigrationPressureLoopTest extends KernelTestCase
         self::assertSame(8, $goal->getCurrentGoalData()['target_x'] ?? null);
         self::assertSame(1, $goal->getCurrentGoalData()['target_y'] ?? null);
     }
+
+    public function testNonInterruptibleCurrentGoalDoesNotConsumeMigrationCap(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $world = new World('seed-migration-non-interruptible');
+        $world->setMapSize(12, 12);
+
+        $sourceTile = new WorldMapTile($world, 1, 1, Biome::City);
+        $sourceTile->setHasSettlement(true);
+
+        $targetTile = new WorldMapTile($world, 8, 1, Biome::City);
+        $targetTile->setHasSettlement(true);
+
+        $source = new Settlement($world, 1, 1);
+        $source->setProsperity(10);
+        $source->addToTreasury(10);
+
+        $target = new Settlement($world, 8, 1);
+        $target->setProsperity(95);
+        $target->addToTreasury(2_500);
+
+        $trainee = new Character($world, 'Trainee', Race::Human);
+        $trainee->setTilePosition(1, 1);
+
+        $civilian = new Character($world, 'Civilian', Race::Human);
+        $civilian->setTilePosition(1, 1);
+
+        $traineeGoal = new CharacterGoal($trainee);
+        $traineeGoal->setLifeGoalCode('fighter.become_strongest');
+        $traineeGoal->setCurrentGoalCode('goal.train_in_dojo');
+        $traineeGoal->setCurrentGoalData(['target_days' => 7, 'days_trained' => 0]);
+        $traineeGoal->setCurrentGoalComplete(false);
+        $traineeGoal->setLastResolvedDay(0);
+
+        $civilianGoal = new CharacterGoal($civilian);
+        $civilianGoal->setLifeGoalCode('civilian.have_family');
+        $civilianGoal->setCurrentGoalCode('goal.earn_money');
+        $civilianGoal->setCurrentGoalData(['target_amount' => 100]);
+        $civilianGoal->setCurrentGoalComplete(false);
+        $civilianGoal->setLastResolvedDay(0);
+
+        $entityManager->persist($world);
+        $entityManager->persist($sourceTile);
+        $entityManager->persist($targetTile);
+        $entityManager->persist($source);
+        $entityManager->persist($target);
+        $entityManager->persist($trainee);
+        $entityManager->persist($civilian);
+        $entityManager->persist($traineeGoal);
+        $entityManager->persist($civilianGoal);
+        $entityManager->flush();
+
+        $handler = self::getContainer()->get(AdvanceDayHandler::class);
+        self::assertInstanceOf(AdvanceDayHandler::class, $handler);
+
+        $handler->advance((int) $world->getId(), 1);
+
+        $traineeCommit = $entityManager->getRepository(CharacterEvent::class)->findOneBy([
+            'world' => $world,
+            'character' => $trainee,
+            'type' => 'settlement_migration_committed',
+            'day' => 1,
+        ]);
+        self::assertNull($traineeCommit);
+
+        $civilianCommit = $entityManager->getRepository(CharacterEvent::class)->findOneBy([
+            'world' => $world,
+            'character' => $civilian,
+            'type' => 'settlement_migration_committed',
+            'day' => 1,
+        ]);
+        self::assertInstanceOf(CharacterEvent::class, $civilianCommit);
+    }
 }
