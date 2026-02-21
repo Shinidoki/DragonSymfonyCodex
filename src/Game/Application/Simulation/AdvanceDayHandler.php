@@ -410,21 +410,23 @@ final class AdvanceDayHandler
             $byCoord[sprintf('%d:%d', $s->getX(), $s->getY())] = $s;
         }
 
+        $active = [];
+
         foreach ($settlementTiles as $tile) {
             $key = sprintf('%d:%d', $tile->getX(), $tile->getY());
-            if (isset($byCoord[$key])) {
-                continue;
+            if (!isset($byCoord[$key])) {
+                $settlement = new Settlement($world, $tile->getX(), $tile->getY());
+                $settlement->setProsperity($this->initialProsperity($world->getSeed(), $tile->getX(), $tile->getY()));
+                $this->entityManager->persist($settlement);
+
+                $existing[]    = $settlement;
+                $byCoord[$key] = $settlement;
             }
 
-            $settlement = new Settlement($world, $tile->getX(), $tile->getY());
-            $settlement->setProsperity($this->initialProsperity($world->getSeed(), $tile->getX(), $tile->getY()));
-            $this->entityManager->persist($settlement);
-
-            $existing[]    = $settlement;
-            $byCoord[$key] = $settlement;
+            $active[] = $byCoord[$key];
         }
 
-        return $existing;
+        return $active;
     }
 
     private function initialProsperity(string $worldSeed, int $x, int $y): int

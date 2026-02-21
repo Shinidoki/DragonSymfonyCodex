@@ -344,6 +344,10 @@ final class AdvanceDayHandlerTest extends TestCase
         $target->setProsperity(90);
         $target->addToTreasury(1000);
 
+        $abandonedSettlement = new \App\Entity\Settlement($world, 5, 0);
+        $abandonedSettlement->setProsperity(99);
+        $abandonedSettlement->addToTreasury(5000);
+
         $worldRepository = $this->createMock(WorldRepository::class);
         $worldRepository->method('find')->with(1)->willReturn($world);
 
@@ -374,7 +378,7 @@ final class AdvanceDayHandlerTest extends TestCase
         );
 
         $settlements = $this->createMock(SettlementRepository::class);
-        $settlements->method('findByWorld')->with($world)->willReturn([$source, $target]);
+        $settlements->method('findByWorld')->with($world)->willReturn([$source, $target, $abandonedSettlement]);
 
         $economyCatalog = new \App\Game\Domain\Economy\EconomyCatalog(
             jobs: [],
@@ -436,12 +440,16 @@ final class AdvanceDayHandlerTest extends TestCase
 
         $handler->advance(1, 1);
 
-        self::assertTrue(
-            (bool) array_filter(
-                $persisted,
-                static fn (object $event): bool => $event instanceof CharacterEvent && $event->getType() === 'settlement_migration_committed',
-            ),
-        );
+        $migrationEvents = array_values(array_filter(
+            $persisted,
+            static fn (object $event): bool => $event instanceof CharacterEvent && $event->getType() === 'settlement_migration_committed',
+        ));
+
+        self::assertNotSame([], $migrationEvents);
+        /** @var CharacterEvent $firstMigration */
+        $firstMigration = $migrationEvents[0];
+        self::assertSame(4, $firstMigration->getData()['target_x'] ?? null);
+        self::assertSame(0, $firstMigration->getData()['target_y'] ?? null);
     }
 
     private function setEntityId(object $entity, int $id): void
