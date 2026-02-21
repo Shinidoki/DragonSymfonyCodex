@@ -82,49 +82,18 @@ php bin/console game:sim:advance --world=1 --days=7
 If a character has a travel target, they travel one tile per day (X-first, then Y) instead of training until they
 arrive.
 
-## Local mode (tick simulation)
+## Overworld + combat model
 
-Local mode is the “Active Zone”: actions are resolved in **ticks** (one action = one tick).
+Gameplay runs through the overworld simulation and combat resolution flow.
 
-Enter local mode for a character (creates or reuses an active local session):
-
-```bash
-php bin/console game:local:enter --character=1 --width=8 --height=8
-```
-
-Apply tick actions:
-
-```bash
-php bin/console game:local:action --session=1 --type=move --dir=north
-php bin/console game:local:action --session=1 --type=wait
-```
-
-Add a local NPC actor and give them an intent (MVP “nearby message” demo):
-
-```bash
-php bin/console game:local:add-actor --session=1 --character=2 --role=npc --x=0 --y=1
-php bin/console game:local:set-intent --actor=<npcActorId> --type=talk_to --target=<playerActorId>
-php bin/console game:local:action --session=1 --type=wait
-```
-
-When the NPC reaches the target and the player is nearby, a descriptive message prints under the tick output.
-
-Sleep/train are **long actions**: they temporarily suspend the local session, advance world time by days, then resume
-the same local session at the same local position.
-
-```bash
-php bin/console game:local:sleep --session=1 --days=1
-php bin/console game:local:train --session=1 --days=7 --context=auto
-```
-
-`--context=auto` currently resolves to `dojo` if the current world-map tile has a dojo flag, otherwise `wilderness`.
-You can also force it: `--context=dojo` or `--context=mentor`.
-
-Exit local mode (suspends the session):
-
-```bash
-php bin/console game:local:exit --session=1
-```
+- Characters move and progress through world simulation commands.
+- Fights resolve in turn-based RPG combat encounters (no separate local tactical runtime).
+- Targeting model is basic: single-target and AoE only.
+- Events and combat outcomes are emitted as part of simulation/combat processing.
+- Tournament simulation now emits interest decision events for observability:
+  - `tournament_interest_evaluated`
+  - `tournament_interest_committed`
+- There is no separate local-zone runtime surface in this architecture.
 
 ## API (read-only)
 
@@ -133,7 +102,6 @@ Example endpoints:
 - `GET /api/worlds/{id}`
 - `GET /api/characters/{id}`
 - `GET /api/worlds/{id}/tiles?x=0&y=0`
-- `GET /api/local-sessions/{id}`
 
 ## Tests
 

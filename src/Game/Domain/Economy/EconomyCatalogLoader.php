@@ -209,6 +209,88 @@ final class EconomyCatalogLoader
             }
         }
 
+        $feedback = $tournaments['tournament_feedback'] ?? [];
+        if (!is_array($feedback)) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback must be a mapping when provided.');
+        }
+
+        $feedbackLookbackDays = $feedback['lookback_days'] ?? 14;
+        if (!is_int($feedbackLookbackDays) || $feedbackLookbackDays < 1) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.lookback_days must be an integer >= 1.');
+        }
+
+        $feedbackSampleSizeMin = $feedback['sample_size_min'] ?? 2;
+        if (!is_int($feedbackSampleSizeMin) || $feedbackSampleSizeMin < 1) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.sample_size_min must be an integer >= 1.');
+        }
+
+        $feedbackSpendMultiplierStep = $feedback['spend_multiplier_step'] ?? 0.1;
+        if ((!is_float($feedbackSpendMultiplierStep) && !is_int($feedbackSpendMultiplierStep)) || $feedbackSpendMultiplierStep < 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_step must be a number >= 0.');
+        }
+
+        $feedbackRadiusDeltaStep = $feedback['radius_delta_step'] ?? 1;
+        if (!is_int($feedbackRadiusDeltaStep) || $feedbackRadiusDeltaStep < 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_step must be an integer >= 0.');
+        }
+
+        $feedbackSpendMultiplierMin = $feedback['spend_multiplier_min'] ?? 0.7;
+        $feedbackSpendMultiplierMax = $feedback['spend_multiplier_max'] ?? 1.3;
+        if ((!is_float($feedbackSpendMultiplierMin) && !is_int($feedbackSpendMultiplierMin)) || $feedbackSpendMultiplierMin <= 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_min must be a number > 0.');
+        }
+        if ((!is_float($feedbackSpendMultiplierMax) && !is_int($feedbackSpendMultiplierMax)) || $feedbackSpendMultiplierMax <= 0) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_max must be a number > 0.');
+        }
+        if ((float)$feedbackSpendMultiplierMin > (float)$feedbackSpendMultiplierMax) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.spend_multiplier_min must be <= spend_multiplier_max.');
+        }
+
+        $feedbackRadiusDeltaMin = $feedback['radius_delta_min'] ?? -3;
+        $feedbackRadiusDeltaMax = $feedback['radius_delta_max'] ?? 3;
+        if (!is_int($feedbackRadiusDeltaMin)) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_min must be an integer.');
+        }
+        if (!is_int($feedbackRadiusDeltaMax)) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_max must be an integer.');
+        }
+        if ($feedbackRadiusDeltaMin > $feedbackRadiusDeltaMax) {
+            throw new \InvalidArgumentException('tournaments.tournament_feedback.radius_delta_min must be <= radius_delta_max.');
+        }
+
+        $tournamentInterest = $raw['tournament_interest'] ?? [];
+        if (!is_array($tournamentInterest)) {
+            throw new \InvalidArgumentException('tournament_interest must be a mapping when provided.');
+        }
+
+        $interestThreshold = $tournamentInterest['commit_threshold'] ?? 60;
+        if (!is_int($interestThreshold) || $interestThreshold < 0 || $interestThreshold > 100) {
+            throw new \InvalidArgumentException('tournament_interest.commit_threshold must be an integer between 0 and 100.');
+        }
+
+        $interestWeights = $tournamentInterest['weights'] ?? [];
+        if (!is_array($interestWeights)) {
+            throw new \InvalidArgumentException('tournament_interest.weights must be a mapping when provided.');
+        }
+
+        $interestDistance = $interestWeights['distance'] ?? 30;
+        $interestPrizePool = $interestWeights['prize_pool'] ?? 25;
+        $interestArchetypeBias = $interestWeights['archetype_bias'] ?? 20;
+        $interestMoneyPressure = $interestWeights['money_pressure'] ?? 15;
+        $interestCooldownPenalty = $interestWeights['cooldown_penalty'] ?? 20;
+
+        foreach ([
+            'tournament_interest.weights.distance' => $interestDistance,
+            'tournament_interest.weights.prize_pool' => $interestPrizePool,
+            'tournament_interest.weights.archetype_bias' => $interestArchetypeBias,
+            'tournament_interest.weights.money_pressure' => $interestMoneyPressure,
+            'tournament_interest.weights.cooldown_penalty' => $interestCooldownPenalty,
+        ] as $key => $val) {
+            if (!is_int($val) || $val < 0) {
+                throw new \InvalidArgumentException(sprintf('%s must be an integer >= 0.', $key));
+            }
+        }
+
         return new EconomyCatalog(
             jobs: $jobDefs,
             employmentPools: $employmentPools,
@@ -241,6 +323,26 @@ final class EconomyCatalogLoader
                     'prosperity_base'      => $prosBase,
                     'prosperity_per_spend' => $prosPerSpend,
                     'per_participant_fame' => $perParticipantFame,
+                ],
+                'tournament_feedback'             => [
+                    'lookback_days'          => $feedbackLookbackDays,
+                    'sample_size_min'        => $feedbackSampleSizeMin,
+                    'spend_multiplier_step'  => (float)$feedbackSpendMultiplierStep,
+                    'radius_delta_step'      => $feedbackRadiusDeltaStep,
+                    'spend_multiplier_min'   => (float)$feedbackSpendMultiplierMin,
+                    'spend_multiplier_max'   => (float)$feedbackSpendMultiplierMax,
+                    'radius_delta_min'       => $feedbackRadiusDeltaMin,
+                    'radius_delta_max'       => $feedbackRadiusDeltaMax,
+                ],
+            ],
+            tournamentInterest: [
+                'commit_threshold' => $interestThreshold,
+                'weights' => [
+                    'distance' => $interestDistance,
+                    'prize_pool' => $interestPrizePool,
+                    'archetype_bias' => $interestArchetypeBias,
+                    'money_pressure' => $interestMoneyPressure,
+                    'cooldown_penalty' => $interestCooldownPenalty,
                 ],
             ],
         );

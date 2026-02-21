@@ -22,6 +22,11 @@ services:
     # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
+        exclude:
+            - '../src/Game/Application/Local/'
+            - '../src/Game/Domain/LocalMap/'
+            - '../src/Game/Domain/LocalNpc/'
+            - '../src/Game/Domain/LocalTurns/'
 
     App\Game\Application\Goal\GoalCatalogProviderInterface:
         alias: App\Game\Application\Goal\GoalCatalogProvider

@@ -75,7 +75,7 @@ final class SimulatedCombatResolverTest extends KernelTestCase
             name: 'Big Beam',
             type: TechniqueType::Charged,
             config: [
-                'delivery'      => 'point',
+                'delivery'      => 'single',
                 'aimModes'      => ['actor'],
                 'kiCost'        => 1,
                 'chargeTicks'   => 1,
@@ -174,5 +174,74 @@ final class SimulatedCombatResolverTest extends KernelTestCase
         $joined = implode("\n", $result->log);
         self::assertStringContainsString('uses Burst on C', $joined);
         self::assertStringNotContainsString('uses Burst on B', $joined);
+    }
+
+    public function testLegacyRayAllStillMapsToMultiTargetDuringCutover(): void
+    {
+        self::bootKernel();
+
+        $em = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($em);
+
+        $world = new World('seed-3');
+        $em->persist($world);
+
+        $attacker = new Character($world, 'A', Race::Human);
+        $enemy1 = new Character($world, 'E1', Race::Human);
+        $enemy2 = new Character($world, 'E2', Race::Human);
+
+        $attacker->applyCoreAttributes(new CoreAttributes(
+            strength: 1,
+            speed: 5,
+            endurance: 5,
+            durability: 1,
+            kiCapacity: 5,
+            kiControl: 10,
+            kiRecovery: 1,
+            focus: 1,
+            discipline: 1,
+            adaptability: 1,
+        ));
+
+        $em->persist($attacker);
+        $em->persist($enemy1);
+        $em->persist($enemy2);
+        $em->flush();
+
+        $legacyRay = new TechniqueDefinition(
+            code: 'legacy_beam',
+            name: 'Legacy Beam',
+            type: TechniqueType::Blast,
+            config: [
+                'delivery'      => 'ray',
+                'piercing'      => 'all',
+                'aimModes'      => ['actor'],
+                'kiCost'        => 1,
+                'damage'        => [
+                    'stat'           => 'kiControl',
+                    'statMultiplier' => 1.0,
+                    'base'           => 10,
+                    'min'            => 1,
+                ],
+                'successChance' => ['at0' => 1.0, 'at100' => 1.0],
+            ],
+        );
+
+        $knowledge = new CharacterTechnique($attacker, $legacyRay, proficiency: 100);
+
+        $resolver = new SimulatedCombatResolver(new SequenceRandomizer([0]));
+
+        $result = $resolver->resolve(
+            combatants: [
+                new SimulatedCombatant($attacker, teamId: 1, techniques: [$knowledge]),
+                new SimulatedCombatant($enemy1, teamId: 2),
+                new SimulatedCombatant($enemy2, teamId: 2),
+            ],
+            rules: new CombatRules(allowFriendlyFire: false, maxActions: 1, allowTransform: false),
+        );
+
+        $joined = implode("\n", $result->log);
+        self::assertStringContainsString('uses Legacy Beam on E1', $joined);
+        self::assertStringContainsString('uses Legacy Beam on E2', $joined);
     }
 }

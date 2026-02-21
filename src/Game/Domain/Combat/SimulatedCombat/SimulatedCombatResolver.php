@@ -278,8 +278,10 @@ final class SimulatedCombatResolver
 
         return match ($delivery) {
             'aoe' => $enemies,
-            'ray' => $this->selectRayTargets($enemies, (string)($config['piercing'] ?? 'first')),
-            'projectile', 'point' => [$this->pickOne($enemies)],
+            // Backward compatibility for legacy configs persisted before cutover.
+            'ray' => $this->selectLegacyRayTargets($enemies, (string)($config['piercing'] ?? 'first')),
+            // Basic targeting model: single-target + AoE only.
+            'single', 'projectile', 'point' => [$this->pickOne($enemies)],
             default => [$this->pickOne($enemies)],
         };
     }
@@ -289,14 +291,17 @@ final class SimulatedCombatResolver
      *
      * @return list<CombatantState>
      */
-    private function selectRayTargets(array $enemies, string $piercing): array
+    private function selectLegacyRayTargets(array $enemies, string $piercing): array
     {
         $piercing = strtolower(trim($piercing));
-        if ($piercing === 'first' || $piercing === '') {
-            return [$this->pickOne($enemies)];
+
+        // Legacy "ray + all" maps to current AoE behavior.
+        if ($piercing === 'all') {
+            return $enemies;
         }
 
-        return $enemies;
+        // Legacy "ray + first" maps to single-target.
+        return [$this->pickOne($enemies)];
     }
 
     /**

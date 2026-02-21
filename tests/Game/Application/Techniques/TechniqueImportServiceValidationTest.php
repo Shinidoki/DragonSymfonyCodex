@@ -108,7 +108,7 @@ final class TechniqueImportServiceValidationTest extends KernelTestCase
             'enabled' => true,
             'version' => 1,
             'config'  => [
-                'aimModes' => ['point'],
+                'aimModes' => ['actor'],
                 'delivery' => 'aoe',
                 'range'    => 2,
                 'kiCost'   => 3,
@@ -116,7 +116,32 @@ final class TechniqueImportServiceValidationTest extends KernelTestCase
         ], JSON_THROW_ON_ERROR));
     }
 
-    public function testImportRejectsRayMissingPiercing(): void
+    public function testImportRejectsLegacyProjectileDelivery(): void
+    {
+        self::bootKernel();
+
+        $entityManager = self::getContainer()->get(EntityManagerInterface::class);
+        $this->resetDatabaseSchema($entityManager);
+
+        $importer = new TechniqueImportService($entityManager);
+
+        $this->expectException(\InvalidArgumentException::class);
+        $importer->importFromJsonString(json_encode([
+            'code'    => 'bad_tech',
+            'name'    => 'Bad Tech',
+            'type'    => 'blast',
+            'enabled' => true,
+            'version' => 1,
+            'config'  => [
+                'aimModes' => ['actor'],
+                'delivery' => 'projectile',
+                'range'    => 2,
+                'kiCost'   => 3,
+            ],
+        ], JSON_THROW_ON_ERROR));
+    }
+
+    public function testImportRejectsDirectionalAimMode(): void
     {
         self::bootKernel();
 
@@ -134,7 +159,7 @@ final class TechniqueImportServiceValidationTest extends KernelTestCase
             'version' => 1,
             'config'  => [
                 'aimModes' => ['dir'],
-                'delivery' => 'ray',
+                'delivery' => 'single',
                 'range'    => 2,
                 'kiCost'   => 3,
             ],

@@ -66,3 +66,21 @@ tournaments:
         prosperity_base: 1
         prosperity_per_spend: 150
         per_participant_fame: 1
+    tournament_feedback:
+        lookback_days: 14
+        sample_size_min: 2
+        spend_multiplier_step: 0.10
+        radius_delta_step: 1
+        spend_multiplier_min: 0.70
+        spend_multiplier_max: 1.30
+        radius_delta_min: -3
+        radius_delta_max: 3
+
+tournament_interest:
+    commit_threshold: 60
+    weights:
+        distance: 30
+        prize_pool: 25
+        archetype_bias: 20
+        money_pressure: 15
+        cooldown_penalty: 20

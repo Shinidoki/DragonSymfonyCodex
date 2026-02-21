@@ -6,12 +6,9 @@
   "version": 1,
   "config": {
       "aimModes": [
-          "actor",
-          "dir",
-          "point"
+          "actor"
       ],
-      "delivery": "projectile",
-      "piercing": "first",
+      "delivery": "single",
     "range": 2,
     "kiCost": 3,
     "damage": {

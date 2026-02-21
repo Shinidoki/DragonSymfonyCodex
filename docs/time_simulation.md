@@ -1,308 +1,116 @@
 # Time & Simulation Resolution
 
-**Design Document (Finalized)**
+**Design Document (Cutover-aligned)**
 
 ---
 
 ## 1. Purpose
 
-This document defines how **time progresses**, how **actions are resolved**, and how **simulation fidelity scales** based on player proximity.
+Defines how time advances and how simulation switches between macro world progression and turn-based combat.
 
-The system must support:
+Goals:
 
-* A large persistent world
-* A detailed local simulation near the player
-* Turn-based combat with speed-based initiative
-* Consistent progression for both player and NPCs
+- large persistent world progression
+- deterministic turn-based combat
+- no local-zone/encounter-space runtime assumptions
 
 ---
 
 ## 2. Core Time Units
 
-### 2.1 Tick (Action-Based)
+### 2.1 Turn step (combat action unit)
 
-A **tick represents exactly one action**.
-
-Examples of actions:
-
-* Move to an adjacent cell
-* Perform an attack
-* Use a technique
-* Interact with an object or NPC
-* Begin or end a transformation
-* Observe / wait / prepare
-
-Key rule:
-
-> **Every meaningful action consumes exactly one tick.**
-
-Ticks are **not seconds**.
-They are abstract action units.
-
-This allows:
-
-* Turn-based combat
-* Deterministic simulation
-* Speed-based action advantage
-
----
-
-### 2.2 Day (Macro Resolution)
-
-A **day** is used for:
-
-* Background NPC simulation
-* Daily schedules and task resolution
-* Off-screen travel and conflict
-* Long-term growth and recovery
-
-Days are resolved in batches when the player is not directly involved.
-
----
-
-## 3. World Structure & Spatial Layers
-
-The game world is divided into **two spatial layers**.
-
----
-
-## 4. World Map (Macro Layer)
-
-The **World Map** consists of **tiles**.
-
-### 4.1 World Map Tiles
-
-* Tile size is variable (biomes, regions, continents)
-* Each tile represents a large area
-* Tiles can contain:
-
-    * Cities
-    * Villages
-    * Wilderness
-    * Special locations
-
-### 4.2 World Map Movement & Time Cost
-
-Moving between world map tiles:
-
-* Consumes **time**, not ticks
-* Time cost depends on:
-
-    * Distance
-    * Mode of travel
+In combat, each meaningful action consumes one turn step.
 
 Examples:
 
-* Walking → slow
-* Vehicle → medium
-* Flying → fast
-* Teleportation → near-instant (rare)
+- basic attack
+- technique use
+- transformation action
+- wait/prepare
 
-Travel time may span:
+This is an abstract action unit, not real-time seconds.
 
-* Hours
-* Days
-* Multiple daily resolutions
+### 2.2 Day (macro simulation unit)
 
-During world map travel:
+Outside active fights, world simulation advances in daily resolution:
 
-* Background NPC simulation continues
-* World events may occur
-* Encounters may be generated
-
----
-
-## 5. Local Map (Micro Layer)
-
-Each world map tile can be entered as a **local map**.
-
-### 5.1 Local Map Properties
-
-* Grid-based (cells)
-* Size may vary per tile
-* Represents streets, fields, interiors, battlefields
-
-### 5.2 Local Map Time Rules
-
-Inside a local map:
-
-* Actions are resolved via **ticks**
-* Movement is cell-by-cell
-* NPCs near the player are fully simulated per tick
-
-The local map is where:
-
-* Exploration happens
-* Conversations occur
-* Combat is initiated and resolved
+- goals
+- travel progression
+- economy/settlement updates
+- event loops
 
 ---
 
-## 6. Simulation Zones
+## 3. Runtime Simulation Modes
 
-### 6.1 Active Zone (Tick Simulation)
+### 3.1 World mode (macro)
 
-The **Active Zone** includes:
+World map and population systems progress through day-scale simulation.
 
-* The current local map
-* All entities visible or directly interacting with the player
+This is the default mode.
 
-Rules:
+### 3.2 Fight mode (micro combat)
 
-* Every entity acts via ticks
-* Full stat, condition, and AI evaluation
-* Immediate reactions possible
+When combat is triggered, the system resolves a turn-based fight encounter.
 
----
+Fight mode is:
 
-### 6.2 Background Zone (Daily Simulation)
-
-Entities outside the Active Zone:
-
-* Are simulated in **daily steps**
-* Resolve schedules and goals once per day
-
-This includes:
-
-* NPC training
-* Travel
-* Conflicts
-* World changes
+- temporary
+- combat-only
+- initiative/speed sensitive
+- independent from any local tactical grid layer
 
 ---
 
-## 7. Transitions Between Simulation Scales
+## 4. Combat Time Model
 
-### 7.1 From Background → Active
+### 4.1 Turn-based with speed influence
 
-When the player enters a tile or an NPC approaches:
+Combat is strictly turn-based.
 
-* The NPC is fast-forwarded to the current time
-* Their daily intent is converted into a concrete local state
+- faster combatants can act more frequently via initiative/turn scheduling
+- each action still costs one turn step
 
-    * Position
-    * Activity
-    * Condition
+### 4.2 Targeting scope
 
-No teleportation or reset occurs.
+Targeting is intentionally basic:
 
----
+- single-target
+- AoE (all enemies in current fight)
 
-### 7.2 From Active → Background
-
-When the player leaves:
-
-* NPCs are summarized into:
-
-    * Current goal
-    * Travel direction
-    * Training/rest state
-* Future actions resume during daily resolution
+Directional or point-on-grid targeting is not part of this model.
 
 ---
 
-## 8. Combat Time Model
+## 5. Transitions
 
-### 8.1 Turn-Based Combat
+### 5.1 World -> Fight
 
-Combat is **turn-based**, but **speed-sensitive**.
+Conflict/event conditions trigger a fight encounter.
 
-* Each combat action consumes one tick
-* Turn order is determined by:
+The fight resolves in turn steps, emits combat result events, and returns control to world simulation.
 
-    * Speed stat
-    * Current condition
-    * Technique modifiers
+### 5.2 Fight -> World
 
----
+After resolution, world/day simulation continues with updated state (health/outcomes/goals/events).
 
-### 8.2 Speed Advantage Rule
-
-If the speed difference is sufficiently high:
-
-* Faster fighters may act multiple times
-* Slower fighters may lose reaction opportunities
-
-Example:
-
-* A very fast character may:
-
-    * Attack twice
-    * Move + attack
-      before a slow opponent can act once
-
-This preserves Dragon Ball–style combat:
-
-> Speed can overwhelm power if the gap is large enough.
+There is no persistent local-map state to serialize.
 
 ---
 
-### 8.3 Combat vs World Time
+## 6. Consistency Rules
 
-While in combat:
-
-* World time outside the local map is effectively paused
-* Only the Active Zone advances via ticks
-
-Once combat ends:
-
-* Normal simulation resumes
+- One combat action = one turn step
+- Same combat rules for NPCs and player-controlled entities
+- Macro world simulation remains event/state consistent after fights
+- No local-zone runtime side channel
 
 ---
 
-## 9. Player Time Control
+## 7. Summary
 
-### 9.1 Normal Play
-
-* Player actions consume ticks
-* NPCs respond per tick
-
-### 9.2 Long Actions / Fast Forward
-
-Player may choose actions like:
-
-* Sleep
-* Train for hours
-* Long-distance travel
-
-These:
-
-* Advance time directly
-* Trigger daily resolution as needed
-* Skip unnecessary ticks
-
----
-
-## 10. Consistency Rules
-
-The simulation must obey:
-
-* **One action = one tick**
-* **Same rules for player and NPCs**
-* **No free actions**
-* **Speed affects frequency, not cost**
-* **Local precision does not change global outcomes**
-
----
-
-## 11. What This Enables
-
-This model supports:
-
-* Deterministic turn-based combat
-* Large-scale persistent worlds
-* Speed-based dominance without real-time chaos
-* Clear AI reasoning
-* Scalable NPC simulation
-* Future multiplayer or replay analysis (if desired)
-
----
-
-## 12. Summary
-
-* A tick represents a single action
-* World map movement consumes time based on travel method
-* Local maps operate on action-based ticks
-* Combat is turn-based with speed-based multiple actions
-* NPCs are simulated at high or low fidelity depending on proximity
-* Time advances consistently and fairly across all systems
+- Macro time: day-based world simulation
+- Micro time: turn-based combat steps
+- Combat is RPG-style turn order with basic targeting only
+- Architecture intentionally excludes encounter-space/local-zone runtime behavior

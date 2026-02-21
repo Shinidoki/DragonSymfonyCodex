@@ -10,6 +10,7 @@ use App\Game\Domain\Goal\CharacterGoalResolver;
 use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Race;
 use PHPUnit\Framework\TestCase;
+use Symfony\Component\Yaml\Yaml;
 
 final class CharacterGoalResolverTest extends TestCase
 {
@@ -362,6 +363,34 @@ final class CharacterGoalResolverTest extends TestCase
 
         self::assertSame(3, $goal->getLastProcessedEventId());
         self::assertSame('goal.idle', $goal->getCurrentGoalCode());
+    }
+
+    public function testGoalsCatalogDefinesTournamentInterestCommitRule(): void
+    {
+        $config = Yaml::parseFile(__DIR__ . '/../../../../config/game/goals.yaml');
+
+        self::assertIsArray($config['event_rules']['tournament_interest_committed']['from'] ?? null);
+        self::assertArrayHasKey('fighter.become_strongest', $config['event_rules']['tournament_interest_committed']['from']);
+        self::assertArrayHasKey('leader.lead_settlement', $config['event_rules']['tournament_interest_committed']['from']);
+
+        self::assertSame(
+            'goal.participate_tournament',
+            $config['event_rules']['tournament_interest_committed']['from']['fighter.become_strongest']['set_current_goal']['code'] ?? null,
+        );
+        self::assertSame(
+            'goal.participate_tournament',
+            $config['event_rules']['tournament_interest_committed']['from']['leader.lead_settlement']['set_current_goal']['code'] ?? null,
+        );
+
+        $leaderPool = $config['life_goals']['leader.lead_settlement']['current_goal_pool'] ?? [];
+        self::assertContains(
+            'goal.participate_tournament',
+            array_values(array_filter(array_map(
+                static fn (mixed $item): mixed => is_array($item) ? ($item['code'] ?? null) : null,
+                is_array($leaderPool) ? $leaderPool : [],
+            ))),
+            'leader.lead_settlement must include goal.participate_tournament in current_goal_pool for compatibility checks.',
+        );
     }
 
     private function withId(int $id, CharacterEvent $event): CharacterEvent

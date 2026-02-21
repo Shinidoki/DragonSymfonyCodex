@@ -106,17 +106,17 @@ final class TechniqueImportService
             throw new \InvalidArgumentException('Technique config.aimModes must be a non-empty list.');
         }
 
-        $allowedAimModes = ['self', 'actor', 'dir', 'point'];
+        $allowedAimModes = ['self', 'actor'];
         foreach ($aimModes as $mode) {
             if (!is_string($mode) || !in_array($mode, $allowedAimModes, true)) {
-                throw new \InvalidArgumentException(sprintf('Invalid aimMode: %s', is_scalar($mode) ? (string)$mode : gettype($mode)));
+                throw new \InvalidArgumentException(sprintf('Invalid aimMode: %s. Allowed: self, actor.', is_scalar($mode) ? (string)$mode : gettype($mode)));
             }
         }
 
         $delivery        = $config['delivery'] ?? null;
-        $allowedDelivery = ['point', 'projectile', 'ray', 'aoe'];
+        $allowedDelivery = ['single', 'aoe'];
         if (!is_string($delivery) || !in_array($delivery, $allowedDelivery, true)) {
-            throw new \InvalidArgumentException('Technique config.delivery must be one of: point, projectile, ray, aoe.');
+            throw new \InvalidArgumentException('Technique config.delivery must be one of: single, aoe.');
         }
 
         if (!isset($config['range']) || !is_int($config['range']) || $config['range'] < 0) {
@@ -130,13 +130,6 @@ final class TechniqueImportService
         if ($delivery === 'aoe') {
             if (!isset($config['aoeRadius']) || !is_int($config['aoeRadius']) || $config['aoeRadius'] < 0) {
                 throw new \InvalidArgumentException('Technique config.aoeRadius must be an int >= 0 when delivery=aoe.');
-            }
-        }
-
-        if ($delivery === 'ray') {
-            $piercing = $config['piercing'] ?? null;
-            if (!is_string($piercing) || !in_array($piercing, ['first', 'all'], true)) {
-                throw new \InvalidArgumentException('Technique config.piercing must be one of: first, all when delivery=ray.');
             }
         }
 

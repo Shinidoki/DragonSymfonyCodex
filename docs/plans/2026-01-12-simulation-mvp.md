@@ -413,7 +413,7 @@ git commit -m "docs: add local dev and simulation commands"
 
 ## Out of Scope (Explicitly Deferred)
 
-- Procedural map generation (tiles/local maps beyond placeholders).
+- Procedural map generation (tiles/encounter maps beyond placeholders).
 - Full NPC goal system, memory/reputation spread, factions, travel/encounters.
 - Unlock logic for transformations/techniques (events, mentors, near-death).
 - Frontend UI/game loop; this plan targets backend foundation first.

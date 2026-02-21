@@ -6,12 +6,10 @@
   "version": 1,
   "config": {
       "aimModes": [
-          "actor",
-          "dir",
-          "point"
+          "actor"
       ],
-      "delivery": "ray",
-      "piercing": "all",
+      "delivery": "aoe",
+      "aoeRadius": 0,
     "range": 4,
     "kiCost": 12,
     "chargeTicks": 2,

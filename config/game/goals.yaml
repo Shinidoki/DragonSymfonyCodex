@@ -50,6 +50,8 @@ life_goals:
                 weight: 2
             -   code: goal.organize_tournament
                 weight: 1
+            -   code: goal.participate_tournament
+                weight: 1
             -   code: goal.earn_money
                 weight: 1
 
@@ -120,9 +122,12 @@ npc_life_goals:
             weight: 1
 
 event_rules:
-    tournament_announced:
+    tournament_interest_committed:
         from:
             fighter.become_strongest:
+                set_current_goal:
+                    code: goal.participate_tournament
+            leader.lead_settlement:
                 set_current_goal:
                     code: goal.participate_tournament
     money_low_employed:
