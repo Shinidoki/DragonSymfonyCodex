@@ -3,6 +3,7 @@
 namespace App\Tests\Game\Integration;
 
 use App\Entity\Character;
+use App\Entity\CharacterEvent;
 use App\Entity\CharacterGoal;
 use App\Entity\Settlement;
 use App\Entity\Tournament;
@@ -94,5 +95,18 @@ final class TournamentBracketResolutionTest extends KernelTestCase
 
         // Prize pool is 50% of spend (200) => 100, split 50/30/20.
         self::assertSame(100, $totalMoney);
+
+        $resolvedEvent = $entityManager->getRepository(CharacterEvent::class)->findOneBy([
+            'world' => $world,
+            'type' => 'tournament_resolved',
+        ]);
+        self::assertInstanceOf(CharacterEvent::class, $resolvedEvent);
+
+        $payload = $resolvedEvent->getData();
+        self::assertIsArray($payload);
+        self::assertSame('resolved', $payload['outcome'] ?? null);
+        self::assertSame(4, $payload['participant_count'] ?? null);
+        self::assertSame(4, $payload['registered_count'] ?? null);
+        self::assertArrayNotHasKey('reason', $payload);
     }
 }

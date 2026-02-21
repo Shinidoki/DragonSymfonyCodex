@@ -89,6 +89,45 @@ final class OrganizeTournamentGoalHandlerTest extends TestCase
         self::assertSame(5, $result->data['target_y']);
     }
 
+    public function testAppliesSettlementDemandFeedbackToSpendAndRadius(): void
+    {
+        $world = new World('seed-1');
+        $world->advanceDays(1);
+
+        $settlement = new Settlement($world, 3, 7);
+        $settlement->addToTreasury(1_000);
+
+        $character = new Character($world, 'Mayor', Race::Human);
+        $character->setEmployment('mayor', 3, 7);
+        $character->setTilePosition(3, 7);
+
+        $handler = new OrganizeTournamentGoalHandler();
+        $result = $handler->step(
+            character: $character,
+            world: $world,
+            data: ['spend' => 200],
+            context: new GoalContext(
+                dojoTiles: [],
+                settlementTiles: [new TileCoord(3, 7)],
+                settlementsByCoord: ['3:7' => $settlement],
+                economyCatalog: $this->economyCatalog(),
+                settlementTournamentFeedbackByCoord: [
+                    '3:7' => [
+                        'spendMultiplier' => 0.5,
+                        'radiusDelta' => 2,
+                        'sampleSize' => 5,
+                    ],
+                ],
+            ),
+        );
+
+        self::assertTrue($result->completed);
+        $eventData = $result->events[0]->getData();
+        self::assertSame(100, $eventData['spend']);
+        self::assertSame(6, $eventData['radius']);
+        self::assertSame(900, $settlement->getTreasury());
+    }
+
     public function testEmitsTournamentAnnouncementEventAndCompletes(): void
     {
         $world = new World('seed-1');

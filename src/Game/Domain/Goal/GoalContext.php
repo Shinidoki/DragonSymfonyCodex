@@ -15,6 +15,7 @@ final readonly class GoalContext
      * @param array<string,Settlement> $settlementsByCoord
      * @param array<string,array<string,int>>                            $settlementBuildingsByCoord
      * @param array<string,array{building_code:string,target_level:int}> $activeSettlementProjectsByCoord
+     * @param array<string,array{spendMultiplier:float,radiusDelta:int,sampleSize:int}> $settlementTournamentFeedbackByCoord
      * @param list<CharacterEvent> $events
      */
     public function __construct(
@@ -24,6 +25,7 @@ final readonly class GoalContext
         public array $settlementBuildingsByCoord = [],
         public array $activeSettlementProjectsByCoord = [],
         public ?EconomyCatalog $economyCatalog = null,
+        public array $settlementTournamentFeedbackByCoord = [],
         public array $events = [],
     )
     {

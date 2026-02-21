@@ -12,6 +12,7 @@ use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
 use App\Game\Application\Settlement\SettlementMigrationPressureService;
 use App\Game\Application\Settlement\SettlementProjectLifecycleService;
+use App\Game\Application\Tournament\TournamentDemandFeedbackService;
 use App\Game\Application\Tournament\TournamentInterestService;
 use App\Game\Application\Tournament\TournamentLifecycleService;
 use App\Game\Domain\Economy\EconomyCatalog;
@@ -54,6 +55,7 @@ final class AdvanceDayHandler
         private readonly ?SettlementSimulationContextBuilder $settlementContextBuilder = null,
         private readonly ?DojoLifecycleService               $dojoLifecycle = null,
         private readonly ?TournamentInterestService          $tournamentInterestService = null,
+        private readonly ?TournamentDemandFeedbackService    $tournamentDemandFeedbackService = null,
         private readonly ?SettlementMigrationPressureService $settlementMigrationPressureService = null,
     )
     {
@@ -135,6 +137,18 @@ final class AdvanceDayHandler
                     $dojoTrainingFeesByCoord,
                 ] = $this->settlementContextBuilder?->build(dojoCoords: $dojoCoords, settlements: $settlementEntities) ?? [[], [], [], [], []];
 
+                $settlementTournamentFeedbackByCoord = [];
+                if ($this->tournamentDemandFeedbackService instanceof TournamentDemandFeedbackService) {
+                    foreach ($settlementEntities as $settlementEntity) {
+                        $coordKey = sprintf('%d:%d', $settlementEntity->getX(), $settlementEntity->getY());
+                        $settlementTournamentFeedbackByCoord[$coordKey] = $this->tournamentDemandFeedbackService->forSettlement(
+                            world: $world,
+                            settlement: $settlementEntity,
+                            worldDay: $world->getCurrentDay() + 1,
+                        );
+                    }
+                }
+
                 $emitted = $this->clock->advanceDays(
                     world: $world,
                     characters: $characters,
@@ -153,6 +167,7 @@ final class AdvanceDayHandler
                     dojoTrainingMultipliersByCoord: $dojoTrainingMultipliersByCoord,
                     dojoMasterCharacterIdByCoord: $dojoMasterCharacterIdByCoord,
                     dojoTrainingFeesByCoord: $dojoTrainingFeesByCoord,
+                    settlementTournamentFeedbackByCoord: $settlementTournamentFeedbackByCoord,
                 );
 
                 foreach ($emitted as $event) {
