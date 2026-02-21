@@ -84,3 +84,14 @@ tournament_interest:
         archetype_bias: 20
         money_pressure: 15
         cooldown_penalty: 20
+
+migration_pressure:
+    lookback_days: 14
+    commit_threshold: 60
+    move_cooldown_days: 3
+    daily_move_cap: 3
+    max_travel_distance: 12
+    weights:
+        prosperity_gap: 30
+        treasury_gap: 20
+        crowding_gap: 15

@@ -263,6 +263,55 @@ final class EconomyCatalogLoader
             throw new \InvalidArgumentException('tournament_interest must be a mapping when provided.');
         }
 
+        $migrationPressure = $raw['migration_pressure'] ?? [];
+        if (!is_array($migrationPressure)) {
+            throw new \InvalidArgumentException('migration_pressure must be a mapping when provided.');
+        }
+
+        $migrationLookbackDays = $migrationPressure['lookback_days'] ?? 14;
+        if (!is_int($migrationLookbackDays) || $migrationLookbackDays < 1) {
+            throw new \InvalidArgumentException('migration_pressure.lookback_days must be an integer >= 1.');
+        }
+
+        $migrationCommitThreshold = $migrationPressure['commit_threshold'] ?? 60;
+        if (!is_int($migrationCommitThreshold) || $migrationCommitThreshold < 1) {
+            throw new \InvalidArgumentException('migration_pressure.commit_threshold must be an integer >= 1.');
+        }
+
+        $migrationMoveCooldownDays = $migrationPressure['move_cooldown_days'] ?? 3;
+        if (!is_int($migrationMoveCooldownDays) || $migrationMoveCooldownDays < 0) {
+            throw new \InvalidArgumentException('migration_pressure.move_cooldown_days must be an integer >= 0.');
+        }
+
+        $migrationDailyMoveCap = $migrationPressure['daily_move_cap'] ?? 3;
+        if (!is_int($migrationDailyMoveCap) || $migrationDailyMoveCap < 1) {
+            throw new \InvalidArgumentException('migration_pressure.daily_move_cap must be an integer >= 1.');
+        }
+
+        $migrationMaxTravelDistance = $migrationPressure['max_travel_distance'] ?? 12;
+        if (!is_int($migrationMaxTravelDistance) || $migrationMaxTravelDistance < 1) {
+            throw new \InvalidArgumentException('migration_pressure.max_travel_distance must be an integer >= 1.');
+        }
+
+        $migrationWeights = $migrationPressure['weights'] ?? [];
+        if (!is_array($migrationWeights)) {
+            throw new \InvalidArgumentException('migration_pressure.weights must be a mapping when provided.');
+        }
+
+        $migrationWeightProsperityGap = $migrationWeights['prosperity_gap'] ?? 30;
+        $migrationWeightTreasuryGap = $migrationWeights['treasury_gap'] ?? 20;
+        $migrationWeightCrowdingGap = $migrationWeights['crowding_gap'] ?? 15;
+
+        foreach ([
+            'migration_pressure.weights.prosperity_gap' => $migrationWeightProsperityGap,
+            'migration_pressure.weights.treasury_gap' => $migrationWeightTreasuryGap,
+            'migration_pressure.weights.crowding_gap' => $migrationWeightCrowdingGap,
+        ] as $key => $val) {
+            if (!is_int($val) || $val < 0) {
+                throw new \InvalidArgumentException(sprintf('%s must be an integer >= 0.', $key));
+            }
+        }
+
         $interestThreshold = $tournamentInterest['commit_threshold'] ?? 60;
         if (!is_int($interestThreshold) || $interestThreshold < 0 || $interestThreshold > 100) {
             throw new \InvalidArgumentException('tournament_interest.commit_threshold must be an integer between 0 and 100.');
@@ -343,6 +392,18 @@ final class EconomyCatalogLoader
                     'archetype_bias' => $interestArchetypeBias,
                     'money_pressure' => $interestMoneyPressure,
                     'cooldown_penalty' => $interestCooldownPenalty,
+                ],
+            ],
+            migrationPressure: [
+                'lookback_days' => $migrationLookbackDays,
+                'commit_threshold' => $migrationCommitThreshold,
+                'move_cooldown_days' => $migrationMoveCooldownDays,
+                'daily_move_cap' => $migrationDailyMoveCap,
+                'max_travel_distance' => $migrationMaxTravelDistance,
+                'weights' => [
+                    'prosperity_gap' => $migrationWeightProsperityGap,
+                    'treasury_gap' => $migrationWeightTreasuryGap,
+                    'crowding_gap' => $migrationWeightCrowdingGap,
                 ],
             ],
         );

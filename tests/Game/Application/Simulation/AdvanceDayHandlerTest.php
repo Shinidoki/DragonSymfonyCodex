@@ -6,11 +6,14 @@ use App\Entity\Character;
 use App\Entity\CharacterEvent;
 use App\Entity\CharacterGoal;
 use App\Entity\World;
+use App\Entity\WorldMapTile;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Simulation\AdvanceDayHandler;
+use App\Game\Application\Settlement\SettlementMigrationPressureService;
 use App\Game\Application\Tournament\TournamentInterestService;
 use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Goal\GoalPlanner;
+use App\Game\Domain\Map\Biome;
 use App\Game\Domain\Goal\Handlers\ParticipateTournamentGoalHandler;
 use App\Game\Domain\Race;
 use App\Game\Domain\Simulation\SimulationClock;
@@ -19,6 +22,7 @@ use App\Repository\CharacterEventRepository;
 use App\Repository\CharacterGoalRepository;
 use App\Repository\CharacterRepository;
 use App\Repository\NpcProfileRepository;
+use App\Repository\SettlementRepository;
 use App\Repository\WorldMapTileRepository;
 use App\Repository\WorldRepository;
 use Doctrine\ORM\EntityManagerInterface;
@@ -310,6 +314,142 @@ final class AdvanceDayHandlerTest extends TestCase
                 static fn (object $event): bool => $event instanceof CharacterEvent && $event->getType() === 'tournament_interest_evaluated',
             ),
         );
+    }
+
+    public function testAdvancePersistsSettlementMigrationEventsWhenServiceConfigured(): void
+    {
+        $world = new World('seed-1');
+
+        $migrant = new Character($world, 'Krillin', Race::Human);
+        $migrant->setTilePosition(0, 0);
+        $this->setEntityId($migrant, 10);
+
+        $targetResident = new Character($world, 'Yamcha', Race::Human);
+        $targetResident->setTilePosition(4, 0);
+        $this->setEntityId($targetResident, 11);
+
+        $crowdA = new Character($world, 'Tien', Race::Human);
+        $crowdA->setTilePosition(0, 0);
+        $this->setEntityId($crowdA, 12);
+
+        $crowdB = new Character($world, 'Chiaotzu', Race::Human);
+        $crowdB->setTilePosition(0, 0);
+        $this->setEntityId($crowdB, 13);
+
+        $source = new \App\Entity\Settlement($world, 0, 0);
+        $source->setProsperity(10);
+        $source->addToTreasury(0);
+
+        $target = new \App\Entity\Settlement($world, 4, 0);
+        $target->setProsperity(90);
+        $target->addToTreasury(1000);
+
+        $abandonedSettlement = new \App\Entity\Settlement($world, 5, 0);
+        $abandonedSettlement->setProsperity(99);
+        $abandonedSettlement->addToTreasury(5000);
+
+        $worldRepository = $this->createMock(WorldRepository::class);
+        $worldRepository->method('find')->with(1)->willReturn($world);
+
+        $characterRepository = $this->createMock(CharacterRepository::class);
+        $characterRepository->method('findBy')->willReturn([$migrant, $targetResident, $crowdA, $crowdB]);
+
+        $npcProfiles = $this->createMock(NpcProfileRepository::class);
+        $npcProfiles->method('findByWorld')->willReturn([]);
+
+        $settlementTileA = new WorldMapTile($world, 0, 0, Biome::Plains);
+        $settlementTileA->setHasSettlement(true);
+        $settlementTileB = new WorldMapTile($world, 4, 0, Biome::Plains);
+        $settlementTileB->setHasSettlement(true);
+
+        $tiles = $this->createMock(WorldMapTileRepository::class);
+        $tiles->method('findBy')->willReturnCallback(
+            static function (array $criteria) use ($world, $settlementTileA, $settlementTileB): array {
+                if ($criteria === ['world' => $world, 'hasDojo' => true]) {
+                    return [];
+                }
+
+                if ($criteria === ['world' => $world, 'hasSettlement' => true]) {
+                    return [$settlementTileA, $settlementTileB];
+                }
+
+                return [];
+            },
+        );
+
+        $settlements = $this->createMock(SettlementRepository::class);
+        $settlements->method('findByWorld')->with($world)->willReturn([$source, $target, $abandonedSettlement]);
+
+        $economyCatalog = new \App\Game\Domain\Economy\EconomyCatalog(
+            jobs: [],
+            employmentPools: [],
+            settlement: ['wage_pool_rate' => 0.7, 'tax_rate' => 0.2, 'production' => ['per_work_unit_base' => 10, 'per_work_unit_prosperity_mult' => 1, 'randomness_pct' => 0.1]],
+            thresholds: ['money_low_employed' => 10, 'money_low_unemployed' => 5],
+            tournaments: ['min_spend' => 50, 'max_spend_fraction_of_treasury' => 0.3, 'prize_pool_fraction' => 0.5, 'duration_days' => 2, 'radius' => ['base' => 2, 'per_spend' => 50, 'max' => 20], 'gains' => ['fame_base' => 1, 'fame_per_spend' => 100, 'prosperity_base' => 1, 'prosperity_per_spend' => 150, 'per_participant_fame' => 1]],
+            migrationPressure: ['lookback_days' => 7, 'commit_threshold' => 50, 'move_cooldown_days' => 0, 'daily_move_cap' => 5, 'max_travel_distance' => 10, 'weights' => ['prosperity_gap' => 30, 'treasury_gap' => 20, 'crowding_gap' => 15]],
+        );
+
+        $economyProvider = new class ($economyCatalog) implements \App\Game\Application\Economy\EconomyCatalogProviderInterface {
+            public function __construct(private readonly \App\Game\Domain\Economy\EconomyCatalog $catalog)
+            {
+            }
+
+            public function get(): \App\Game\Domain\Economy\EconomyCatalog
+            {
+                return $this->catalog;
+            }
+        };
+
+        $characterGoals = $this->createMock(CharacterGoalRepository::class);
+        $characterGoals->method('findByWorld')->willReturn([]);
+
+        $characterEvents = $this->createMock(CharacterEventRepository::class);
+        $characterEvents->method('findByWorldUpToDay')->willReturn([]);
+
+        $goalProvider = $this->createMock(GoalCatalogProviderInterface::class);
+        $goalProvider->method('get')->willReturn(new GoalCatalog([], [], [], []));
+
+        $eventRepo = $this->createMock(\Doctrine\ORM\EntityRepository::class);
+        $eventRepo->method('findBy')->willReturn([]);
+
+        $persisted = [];
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->method('getRepository')->willReturn($eventRepo);
+        $entityManager->method('persist')->willReturnCallback(static function (object $entity) use (&$persisted): void {
+            $persisted[] = $entity;
+        });
+        $entityManager->expects(self::exactly(2))->method('flush');
+
+        $clock = new SimulationClock(new TrainingGrowthService());
+        $migrationService = new SettlementMigrationPressureService($entityManager, $economyProvider);
+
+        $handler = new AdvanceDayHandler(
+            $worldRepository,
+            $characterRepository,
+            $npcProfiles,
+            $tiles,
+            $clock,
+            $entityManager,
+            $characterGoals,
+            $characterEvents,
+            $goalProvider,
+            $settlements,
+            $economyProvider,
+            settlementMigrationPressureService: $migrationService,
+        );
+
+        $handler->advance(1, 1);
+
+        $migrationEvents = array_values(array_filter(
+            $persisted,
+            static fn (object $event): bool => $event instanceof CharacterEvent && $event->getType() === 'settlement_migration_committed',
+        ));
+
+        self::assertNotSame([], $migrationEvents);
+        /** @var CharacterEvent $firstMigration */
+        $firstMigration = $migrationEvents[0];
+        self::assertSame(4, $firstMigration->getData()['target_x'] ?? null);
+        self::assertSame(0, $firstMigration->getData()['target_y'] ?? null);
     }
 
     private function setEntityId(object $entity, int $id): void

@@ -87,7 +87,7 @@ final class TournamentInterestService
                     $reasonCode = 'cannot_arrive_in_time';
                 }
 
-                $factors = $this->computeFactors($character, $tournament, $distance, $economyCatalog);
+                $factors = $this->computeFactors($world, $worldDay, $character, $tournament, $distance, $economyCatalog);
                 $score = array_sum($factors);
                 $decision = ($feasible && $score >= $economyCatalog->tournamentInterestCommitThreshold()) ? 'committed' : 'declined';
                 if ($reasonCode === null && $decision !== 'committed') {
@@ -139,7 +139,7 @@ final class TournamentInterestService
     }
 
     /** @return array{distance:int,prize_pool:int,archetype_bias:int,money_pressure:int,cooldown_penalty:int} */
-    private function computeFactors(Character $character, Tournament $tournament, int $distance, EconomyCatalog $economyCatalog): array
+    private function computeFactors(World $world, int $worldDay, Character $character, Tournament $tournament, int $distance, EconomyCatalog $economyCatalog): array
     {
         $distanceWeight = $economyCatalog->tournamentInterestWeightDistance();
         $radius = max(1, $tournament->getRadius());
@@ -159,7 +159,40 @@ final class TournamentInterestService
             'prize_pool' => (int) round($prizeWeight * $prizeScore),
             'archetype_bias' => $economyCatalog->tournamentInterestWeightArchetypeBias(),
             'money_pressure' => (int) round($moneyWeight * $moneyScore),
-            'cooldown_penalty' => 0,
+            'cooldown_penalty' => $this->cooldownPenalty(world: $world, worldDay: $worldDay, character: $character, economyCatalog: $economyCatalog),
         ];
     }
+
+    private function cooldownPenalty(World $world, int $worldDay, Character $character, EconomyCatalog $economyCatalog): int
+    {
+        $characterId = $character->getId();
+        if ($characterId === null) {
+            return 0;
+        }
+
+        /** @var list<CharacterEvent> $recent */
+        $recent = $this->entityManager->getRepository(CharacterEvent::class)->findBy([
+            'world' => $world,
+            'character' => $character,
+            'type' => 'tournament_interest_committed',
+        ], ['day' => 'DESC', 'id' => 'DESC'], 1);
+
+        if ($recent === []) {
+            return 0;
+        }
+
+        $last = $recent[0] ?? null;
+        if (!$last instanceof CharacterEvent) {
+            return 0;
+        }
+
+        $lastDay = $last->getDay();
+        $cooldownDays = 3;
+        if (($worldDay - $lastDay) > $cooldownDays) {
+            return 0;
+        }
+
+        return -$economyCatalog->tournamentInterestWeightCooldownPenalty();
+    }
+
 }

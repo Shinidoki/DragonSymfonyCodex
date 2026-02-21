@@ -10,6 +10,7 @@ use App\Game\Application\Dojo\DojoLifecycleService;
 use App\Game\Application\Economy\EconomyCatalogProviderInterface;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Settlement\ProjectCatalogProviderInterface;
+use App\Game\Application\Settlement\SettlementMigrationPressureService;
 use App\Game\Application\Settlement\SettlementProjectLifecycleService;
 use App\Game\Application\Tournament\TournamentDemandFeedbackService;
 use App\Game\Application\Tournament\TournamentInterestService;
@@ -55,6 +56,7 @@ final class AdvanceDayHandler
         private readonly ?DojoLifecycleService               $dojoLifecycle = null,
         private readonly ?TournamentInterestService          $tournamentInterestService = null,
         private readonly ?TournamentDemandFeedbackService    $tournamentDemandFeedbackService = null,
+        private readonly ?SettlementMigrationPressureService $settlementMigrationPressureService = null,
     )
     {
     }
@@ -207,6 +209,45 @@ final class AdvanceDayHandler
 
                     foreach ($interestEvents as $event) {
                         $this->entityManager->persist($event);
+                    }
+
+                    $this->entityManager->flush();
+
+                    if (
+                        $this->tournamentLifecycle instanceof TournamentLifecycleService
+                        && $economyCatalog instanceof EconomyCatalog
+                        && $settlementEntities !== []
+                    ) {
+                        $this->tournamentLifecycle->registerParticipantsForDay(
+                            world: $world,
+                            worldDay: $world->getCurrentDay(),
+                            characters: $characters,
+                            goalsByCharacterId: $goalsByCharacterId,
+                        );
+                        $this->entityManager->flush();
+                    }
+                }
+
+                if (
+                    $this->settlementMigrationPressureService instanceof SettlementMigrationPressureService
+                    && $economyCatalog instanceof EconomyCatalog
+                    && $settlementEntities !== []
+                ) {
+                    $migrationEvents = $this->settlementMigrationPressureService->advanceDay(
+                        world: $world,
+                        worldDay: $world->getCurrentDay(),
+                        characters: $characters,
+                        settlements: $settlementEntities,
+                        goalsByCharacterId: $goalsByCharacterId,
+                        goalCatalog: $catalog,
+                    );
+
+                    foreach ($migrationEvents as $event) {
+                        $this->entityManager->persist($event);
+                    }
+
+                    if ($migrationEvents !== []) {
+                        $emitted = [...$emitted, ...$migrationEvents];
                     }
 
                     $this->entityManager->flush();
@@ -386,21 +427,23 @@ final class AdvanceDayHandler
             $byCoord[sprintf('%d:%d', $s->getX(), $s->getY())] = $s;
         }
 
+        $active = [];
+
         foreach ($settlementTiles as $tile) {
             $key = sprintf('%d:%d', $tile->getX(), $tile->getY());
-            if (isset($byCoord[$key])) {
-                continue;
+            if (!isset($byCoord[$key])) {
+                $settlement = new Settlement($world, $tile->getX(), $tile->getY());
+                $settlement->setProsperity($this->initialProsperity($world->getSeed(), $tile->getX(), $tile->getY()));
+                $this->entityManager->persist($settlement);
+
+                $existing[]    = $settlement;
+                $byCoord[$key] = $settlement;
             }
 
-            $settlement = new Settlement($world, $tile->getX(), $tile->getY());
-            $settlement->setProsperity($this->initialProsperity($world->getSeed(), $tile->getX(), $tile->getY()));
-            $this->entityManager->persist($settlement);
-
-            $existing[]    = $settlement;
-            $byCoord[$key] = $settlement;
+            $active[] = $byCoord[$key];
         }
 
-        return $existing;
+        return $active;
     }
 
     private function initialProsperity(string $worldSeed, int $x, int $y): int

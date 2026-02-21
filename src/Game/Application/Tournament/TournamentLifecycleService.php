@@ -183,6 +183,29 @@ final class TournamentLifecycleService
     }
 
     /**
+     * @param list<Character>          $characters
+     * @param array<int,CharacterGoal> $goalsByCharacterId
+     */
+    public function registerParticipantsForDay(World $world, int $worldDay, array $characters, array $goalsByCharacterId): void
+    {
+        $charactersById = [];
+        foreach ($characters as $c) {
+            $id = $c->getId();
+            if ($id !== null) {
+                $charactersById[(int) $id] = $c;
+            }
+        }
+
+        /** @var list<Tournament> $active */
+        $active = $this->entityManager->getRepository(Tournament::class)
+            ->findBy(['world' => $world, 'status' => Tournament::STATUS_SCHEDULED], ['id' => 'ASC']);
+
+        foreach ($active as $tournament) {
+            $this->registerParticipants($tournament, $worldDay, $charactersById, $goalsByCharacterId);
+        }
+    }
+
+    /**
      * @param array<int,Character>     $charactersById
      * @param array<int,CharacterGoal> $goalsByCharacterId
      */
