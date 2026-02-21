@@ -58,6 +58,28 @@ final class SimulationBenchmarkRunnerTest extends TestCase
         self::assertSame('unemployment_rate', $result['violations'][0]['metric']);
     }
 
+    public function testFailsWhenNoKpiSamplesExistInRequestedWindow(): void
+    {
+        $world = new World('seed');
+
+        $repo = $this->createMock(SimulationDailyKpiRepository::class);
+        $repo->method('findByWorldDayRange')->willReturn([]);
+
+        $catalogProvider = $this->createMock(SimulationBalancingCatalogProviderInterface::class);
+        $catalogProvider->method('get')->willReturn(new SimulationBalancingCatalog([
+            'default' => ['unemployment_rate' => ['max' => 0.35]],
+        ]));
+
+        $runner = new SimulationBenchmarkRunner($repo, $catalogProvider);
+        $result = $runner->run($world, 5, 'default');
+
+        self::assertFalse($result['passed']);
+        self::assertCount(1, $result['violations']);
+        self::assertSame('sample_size', $result['violations'][0]['metric']);
+        self::assertSame('min', $result['violations'][0]['kind']);
+        self::assertSame(0.0, $result['violations'][0]['observed']);
+    }
+
     private function kpi(World $world, int $day, float $unemploymentRate): SimulationDailyKpi
     {
         return new SimulationDailyKpi($world, $day, 1, 10, 2, $unemploymentRate, 0, 0, 0, 0, 50.0, 100.0);

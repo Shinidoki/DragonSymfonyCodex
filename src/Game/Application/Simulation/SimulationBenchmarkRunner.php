@@ -36,6 +36,20 @@ final class SimulationBenchmarkRunner implements SimulationBenchmarkRunnerInterf
             throw new \InvalidArgumentException(sprintf('Unknown balancing profile: %s', $profile));
         }
 
+        if ($rows === []) {
+            return [
+                'passed' => false,
+                'profile' => $profile,
+                'sample_size' => 0,
+                'violations' => [[
+                    'metric' => 'sample_size',
+                    'kind' => 'min',
+                    'observed' => 0.0,
+                    'min' => 1.0,
+                ]],
+            ];
+        }
+
         $violations = [];
         foreach ($thresholds as $metric => $bounds) {
             $values = array_map(static fn (SimulationDailyKpi $kpi): float => self::metricValue($kpi, $metric), $rows);
