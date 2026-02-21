@@ -230,6 +230,49 @@ final class SettlementMigrationPressureServiceTest extends TestCase
         self::assertSame(8, $events[0]->getData()['character_id'] ?? null);
     }
 
+    public function testUnknownCurrentGoalCodeDoesNotBreakMigrationEvaluation(): void
+    {
+        $world = new World('seed-1');
+
+        $source = new Settlement($world, 1, 1);
+        $source->setProsperity(20);
+        $destination = new Settlement($world, 3, 2);
+        $destination->setProsperity(90);
+
+        $character = new Character($world, 'LegacyGoal', Race::Human);
+        $character->setTilePosition(1, 1);
+        $this->setEntityId($character, 7);
+
+        $goal = new CharacterGoal($character);
+        $goal->setCurrentGoalCode('goal.legacy_deleted');
+        $goal->setCurrentGoalComplete(false);
+
+        $service = new SettlementMigrationPressureService(
+            entityManager: $this->mockEntityManager([]),
+            economyCatalogProvider: $this->provider($this->economyCatalog([
+                'daily_move_cap' => 1,
+                'commit_threshold' => 1,
+            ])),
+        );
+
+        $events = $service->advanceDay(
+            world: $world,
+            worldDay: 10,
+            characters: [$character],
+            settlements: [$source, $destination],
+            goalsByCharacterId: [7 => $goal],
+            goalCatalog: new GoalCatalog(
+                lifeGoals: [],
+                currentGoals: [
+                    'goal.train_in_dojo' => ['interruptible' => false],
+                ],
+            ),
+        );
+
+        self::assertCount(1, $events);
+        self::assertSame(7, $events[0]->getData()['character_id'] ?? null);
+    }
+
     public function testLookbackDaysLimitsCooldownWindow(): void
     {
         $world = new World('seed-1');

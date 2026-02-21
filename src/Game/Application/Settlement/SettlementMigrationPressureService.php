@@ -195,7 +195,12 @@ final class SettlementMigrationPressureService
             return false;
         }
 
-        return !$goalCatalog->currentGoalInterruptible($currentGoalCode);
+        try {
+            return !$goalCatalog->currentGoalInterruptible($currentGoalCode);
+        } catch (\InvalidArgumentException) {
+            // Unknown/stale goal codes should not block migration pressure evaluation.
+            return false;
+        }
     }
 
     /** @param array<int,int> $latestMigrationDayByCharacterId */
