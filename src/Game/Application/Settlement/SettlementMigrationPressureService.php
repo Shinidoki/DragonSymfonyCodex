@@ -55,13 +55,9 @@ final class SettlementMigrationPressureService
             $populationByKey[$key] = ($populationByKey[$key] ?? 0) + 1;
         }
 
-        $events = [];
+        $candidates = [];
 
         foreach ($characters as $character) {
-            if (count($events) >= $dailyCap) {
-                break;
-            }
-
             $characterId = $character->getId();
             if ($characterId === null) {
                 continue;
@@ -116,22 +112,48 @@ final class SettlementMigrationPressureService
                 continue;
             }
 
+            $candidates[] = [
+                'character' => $character,
+                'character_id' => (int) $characterId,
+                'source' => $source,
+                'destination' => $best['destination'],
+                'score' => $best['score'],
+                'components' => $best['components'],
+            ];
+        }
+
+        usort($candidates, static function (array $left, array $right): int {
+            $scoreComparison = $right['score'] <=> $left['score'];
+            if ($scoreComparison !== 0) {
+                return $scoreComparison;
+            }
+
+            return $left['character_id'] <=> $right['character_id'];
+        });
+
+        $events = [];
+        foreach (array_slice($candidates, 0, $dailyCap) as $candidate) {
+            /** @var Settlement $source */
+            $source = $candidate['source'];
             /** @var Settlement $target */
-            $target = $best['destination'];
+            $target = $candidate['destination'];
+
+            /** @var Character $candidateCharacter */
+            $candidateCharacter = $candidate['character'];
 
             $events[] = new CharacterEvent(
                 world: $world,
-                character: $character,
+                character: $candidateCharacter,
                 type: 'settlement_migration_committed',
                 day: $worldDay,
                 data: [
-                    'character_id' => (int) $characterId,
+                    'character_id' => $candidate['character_id'],
                     'from_x' => $source->getX(),
                     'from_y' => $source->getY(),
                     'target_x' => $target->getX(),
                     'target_y' => $target->getY(),
-                    'score_total' => $best['score'],
-                    'score_components' => $best['components'],
+                    'score_total' => $candidate['score'],
+                    'score_components' => $candidate['components'],
                     'world_day' => $worldDay,
                 ],
             );

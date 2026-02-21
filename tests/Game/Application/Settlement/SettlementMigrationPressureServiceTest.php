@@ -146,6 +146,41 @@ final class SettlementMigrationPressureServiceTest extends TestCase
         self::assertSame(8, $events[0]->getData()['character_id'] ?? null);
     }
 
+    public function testDailyCapSelectsHighestScoringMigrationAcrossAllCandidates(): void
+    {
+        $world = new World('seed-1');
+
+        $sourceLow = new Settlement($world, 1, 1);
+        $sourceLow->setProsperity(85);
+
+        $sourceHigh = new Settlement($world, 2, 2);
+        $sourceHigh->setProsperity(10);
+
+        $destination = new Settlement($world, 4, 2);
+        $destination->setProsperity(95);
+
+        $lowPressureCharacter = new Character($world, 'Low', Race::Human);
+        $lowPressureCharacter->setTilePosition(1, 1);
+        $this->setEntityId($lowPressureCharacter, 7);
+
+        $highPressureCharacter = new Character($world, 'High', Race::Human);
+        $highPressureCharacter->setTilePosition(2, 2);
+        $this->setEntityId($highPressureCharacter, 8);
+
+        $service = new SettlementMigrationPressureService(
+            entityManager: $this->mockEntityManager([]),
+            economyCatalogProvider: $this->provider($this->economyCatalog([
+                'daily_move_cap' => 1,
+                'commit_threshold' => 1,
+            ])),
+        );
+
+        $events = $service->advanceDay($world, 10, [$lowPressureCharacter, $highPressureCharacter], [$sourceLow, $sourceHigh, $destination]);
+
+        self::assertCount(1, $events);
+        self::assertSame(8, $events[0]->getData()['character_id'] ?? null);
+    }
+
     public function testLookbackDaysLimitsCooldownWindow(): void
     {
         $world = new World('seed-1');
