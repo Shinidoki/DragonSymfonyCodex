@@ -35,6 +35,10 @@ final class SettlementMigrationPressureService
         $dailyCap = $catalog->migrationPressureDailyMoveCap();
         $threshold = $catalog->migrationPressureCommitThreshold();
         $maxDistance = $catalog->migrationPressureMaxTravelDistance();
+        $cooldownDays = $catalog->migrationPressureMoveCooldownDays();
+        $lookbackDays = $catalog->migrationPressureLookbackDays();
+
+        $latestMigrationDayByCharacterId = $this->latestMigrationDayByCharacterId($world, $characters);
 
         $settlementsByKey = [];
         foreach ($settlements as $settlement) {
@@ -67,7 +71,7 @@ final class SettlementMigrationPressureService
                 continue;
             }
 
-            if ($this->isInCooldownWindow($world, $worldDay, $character, $catalog->migrationPressureMoveCooldownDays())) {
+            if ($this->isInCooldownWindow($worldDay, $character, $cooldownDays, $lookbackDays, $latestMigrationDayByCharacterId)) {
                 continue;
             }
 
@@ -136,29 +140,65 @@ final class SettlementMigrationPressureService
         return $events;
     }
 
-    private function isInCooldownWindow(World $world, int $worldDay, Character $character, int $cooldownDays): bool
+    /** @param array<int,int> $latestMigrationDayByCharacterId */
+    private function isInCooldownWindow(int $worldDay, Character $character, int $cooldownDays, int $lookbackDays, array $latestMigrationDayByCharacterId): bool
     {
         if ($cooldownDays <= 0) {
             return false;
         }
 
-        /** @var list<CharacterEvent> $recent */
-        $recent = $this->entityManager->getRepository(CharacterEvent::class)->findBy([
-            'world' => $world,
-            'character' => $character,
-            'type' => 'settlement_migration_committed',
-        ], ['day' => 'DESC', 'id' => 'DESC'], 1);
-
-        if ($recent === []) {
+        $characterId = $character->getId();
+        if (!is_int($characterId)) {
             return false;
         }
 
-        $lastDay = $recent[0]?->getDay();
+        $lastDay = $latestMigrationDayByCharacterId[$characterId] ?? null;
         if (!is_int($lastDay)) {
             return false;
         }
 
-        return ($worldDay - $lastDay) <= $cooldownDays;
+        $age = $worldDay - $lastDay;
+
+        return $age <= $cooldownDays && $age <= $lookbackDays;
+    }
+
+    /**
+     * @param list<Character> $characters
+     *
+     * @return array<int,int>
+     */
+    private function latestMigrationDayByCharacterId(World $world, array $characters): array
+    {
+        $charactersWithIds = array_values(array_filter(
+            $characters,
+            static fn (Character $character): bool => is_int($character->getId()),
+        ));
+
+        if ($charactersWithIds === []) {
+            return [];
+        }
+
+        /** @var list<CharacterEvent> $recent */
+        $recent = $this->entityManager->getRepository(CharacterEvent::class)->findBy([
+            'world' => $world,
+            'character' => $charactersWithIds,
+            'type' => 'settlement_migration_committed',
+        ], ['day' => 'DESC', 'id' => 'DESC']);
+
+        $latestByCharacterId = [];
+        foreach ($recent as $event) {
+            $characterId = $event->getCharacter()?->getId();
+            $day = $event->getDay();
+            if (!is_int($characterId) || !is_int($day)) {
+                continue;
+            }
+
+            if (!array_key_exists($characterId, $latestByCharacterId)) {
+                $latestByCharacterId[$characterId] = $day;
+            }
+        }
+
+        return $latestByCharacterId;
     }
 
     private function xyKey(int $x, int $y): string

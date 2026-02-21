@@ -84,11 +84,78 @@ final class SettlementMigrationPressureServiceTest extends TestCase
         self::assertSame([], $events);
     }
 
+    public function testCooldownLookupIsBatchedOnceForAllCharacters(): void
+    {
+        $world = new World('seed-1');
+
+        $source = new Settlement($world, 1, 1);
+        $source->setProsperity(20);
+
+        $destination = new Settlement($world, 3, 2);
+        $destination->setProsperity(90);
+
+        $characters = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $character = new Character($world, 'Traveler-' . $i, Race::Human);
+            $character->setTilePosition(1, 1);
+            $this->setEntityId($character, $i);
+            $characters[] = $character;
+        }
+
+        $service = new SettlementMigrationPressureService(
+            entityManager: $this->mockEntityManager([], expectedFindByCalls: 1),
+            economyCatalogProvider: $this->provider($this->economyCatalog()),
+        );
+
+        $events = $service->advanceDay($world, 10, $characters, [$source, $destination]);
+
+        self::assertNotSame([], $events);
+    }
+
+    public function testLookbackDaysLimitsCooldownWindow(): void
+    {
+        $world = new World('seed-1');
+
+        $source = new Settlement($world, 1, 1);
+        $source->setProsperity(20);
+        $destination = new Settlement($world, 3, 2);
+        $destination->setProsperity(90);
+
+        $character = new Character($world, 'Traveler', Race::Human);
+        $character->setTilePosition(1, 1);
+        $this->setEntityId($character, 7);
+
+        $pastMove = new CharacterEvent(
+            world: $world,
+            character: $character,
+            type: 'settlement_migration_committed',
+            day: 5,
+            data: ['target_x' => 3, 'target_y' => 2],
+        );
+
+        $service = new SettlementMigrationPressureService(
+            entityManager: $this->mockEntityManager([$pastMove]),
+            economyCatalogProvider: $this->provider($this->economyCatalog([
+                'lookback_days' => 3,
+                'move_cooldown_days' => 10,
+                'commit_threshold' => 1,
+            ])),
+        );
+
+        $events = $service->advanceDay($world, 10, [$character], [$source, $destination]);
+
+        self::assertCount(1, $events);
+    }
+
     /** @param list<CharacterEvent> $recentEvents */
-    private function mockEntityManager(array $recentEvents): EntityManagerInterface
+    private function mockEntityManager(array $recentEvents, ?int $expectedFindByCalls = null): EntityManagerInterface
     {
         $eventRepo = $this->createMock(EntityRepository::class);
-        $eventRepo->method('findBy')->willReturn($recentEvents);
+        if ($expectedFindByCalls !== null) {
+            $eventRepo->expects(self::exactly($expectedFindByCalls))->method('findBy')->willReturn($recentEvents);
+        } else {
+            $eventRepo->method('findBy')->willReturn($recentEvents);
+        }
 
         $em = $this->createMock(EntityManagerInterface::class);
         $em->method('getRepository')->willReturn($eventRepo);
@@ -110,8 +177,17 @@ final class SettlementMigrationPressureServiceTest extends TestCase
         };
     }
 
-    private function economyCatalog(): EconomyCatalog
+    /** @param array<string,int> $migrationOverrides */
+    private function economyCatalog(array $migrationOverrides = []): EconomyCatalog
     {
+        $migrationPressure = array_replace([
+            'lookback_days' => 14,
+            'commit_threshold' => 50,
+            'move_cooldown_days' => 3,
+            'daily_move_cap' => 3,
+            'max_travel_distance' => 12,
+        ], $migrationOverrides);
+
         return new EconomyCatalog(
             jobs: [],
             employmentPools: [],
@@ -120,11 +196,11 @@ final class SettlementMigrationPressureServiceTest extends TestCase
             tournaments: ['min_spend' => 50, 'max_spend_fraction_of_treasury' => 0.3, 'prize_pool_fraction' => 0.5, 'duration_days' => 2, 'radius' => ['base' => 2, 'per_spend' => 50, 'max' => 20], 'gains' => ['fame_base' => 1, 'fame_per_spend' => 100, 'prosperity_base' => 1, 'prosperity_per_spend' => 150, 'per_participant_fame' => 1]],
             tournamentInterest: [],
             migrationPressure: [
-                'lookback_days' => 14,
-                'commit_threshold' => 50,
-                'move_cooldown_days' => 3,
-                'daily_move_cap' => 3,
-                'max_travel_distance' => 12,
+                'lookback_days' => $migrationPressure['lookback_days'],
+                'commit_threshold' => $migrationPressure['commit_threshold'],
+                'move_cooldown_days' => $migrationPressure['move_cooldown_days'],
+                'daily_move_cap' => $migrationPressure['daily_move_cap'],
+                'max_travel_distance' => $migrationPressure['max_travel_distance'],
                 'weights' => [
                     'prosperity_gap' => 30,
                     'treasury_gap' => 20,
