@@ -130,6 +130,24 @@ event_rules:
             leader.lead_settlement:
                 set_current_goal:
                     code: goal.participate_tournament
+    settlement_migration_committed:
+        from:
+            civilian.have_family:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
+            civilian.organize_events:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
+            fighter.become_strongest:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
+            wanderer.see_the_world:
+                chance: 1.0
+                set_current_goal:
+                    code: goal.find_job
     money_low_employed:
         from:
             civilian.have_family:

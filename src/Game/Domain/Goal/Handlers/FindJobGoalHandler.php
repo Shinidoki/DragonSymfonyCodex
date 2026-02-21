@@ -40,13 +40,14 @@ final class FindJobGoalHandler implements CurrentGoalHandlerInterface
 
         $target = null;
         if (is_int($targetX) && is_int($targetY)) {
-            if ($targetX >= 0 && $targetY >= 0 && ($width <= 0 || $targetX < $width) && ($height <= 0 || $targetY < $height)) {
-                foreach ($settlements as $s) {
-                    if ($s->x === $targetX && $s->y === $targetY) {
-                        $target = $s;
-                        break;
-                    }
-                }
+            if (
+                $targetX >= 0
+                && $targetY >= 0
+                && ($width <= 0 || $targetX < $width)
+                && ($height <= 0 || $targetY < $height)
+                && $this->containsTileCoord($settlements, $targetX, $targetY)
+            ) {
+                $target = new TileCoord($targetX, $targetY);
             }
         }
 
@@ -78,6 +79,20 @@ final class FindJobGoalHandler implements CurrentGoalHandlerInterface
             data: $data,
             completed: false,
         );
+    }
+
+    /**
+     * @param list<TileCoord> $settlements
+     */
+    private function containsTileCoord(array $settlements, int $x, int $y): bool
+    {
+        foreach ($settlements as $settlement) {
+            if ($settlement->x === $x && $settlement->y === $y) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
