@@ -1,0 +1,18 @@
+profiles:
+  default:
+    settlements_active:
+      min: 1
+    population_total:
+      min: 1
+    unemployment_rate:
+      max: 0.35
+    tournament_canceled:
+      max: 25
+  stress:
+    settlements_active:
+      min: 1
+    unemployment_rate:
+      max: 0.45
+    migration_commits:
+      min: 0
+      max: 50

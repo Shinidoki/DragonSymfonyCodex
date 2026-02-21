@@ -37,6 +37,12 @@ services:
     App\Game\Application\Settlement\ProjectCatalogProviderInterface:
         alias: App\Game\Application\Settlement\YamlProjectCatalogProvider
 
+    App\Game\Application\Simulation\SimulationBalancingCatalogProviderInterface:
+        alias: App\Game\Application\Simulation\YamlSimulationBalancingCatalogProvider
+
+    App\Game\Application\Simulation\SimulationBenchmarkRunnerInterface:
+        alias: App\Game\Application\Simulation\SimulationBenchmarkRunner
+
     App\Game\Domain\Goal\GoalPlanner:
         arguments:
             $handlers: !tagged_iterator app.current_goal_handler

@@ -57,6 +57,7 @@ final class AdvanceDayHandler
         private readonly ?TournamentInterestService          $tournamentInterestService = null,
         private readonly ?TournamentDemandFeedbackService    $tournamentDemandFeedbackService = null,
         private readonly ?SettlementMigrationPressureService $settlementMigrationPressureService = null,
+        private readonly ?SimulationDailyKpiRecorder $simulationDailyKpiRecorder = null,
     )
     {
     }
@@ -174,6 +175,8 @@ final class AdvanceDayHandler
                     $this->entityManager->persist($event);
                 }
 
+                $kpiEvents = $emitted;
+
                 $this->entityManager->flush();
 
                 if (
@@ -195,6 +198,10 @@ final class AdvanceDayHandler
                         $this->entityManager->persist($event);
                     }
 
+                    if ($tournamentEvents !== []) {
+                        $kpiEvents = [...$kpiEvents, ...$tournamentEvents];
+                    }
+
                     $this->entityManager->flush();
                 }
 
@@ -209,6 +216,10 @@ final class AdvanceDayHandler
 
                     foreach ($interestEvents as $event) {
                         $this->entityManager->persist($event);
+                    }
+
+                    if ($interestEvents !== []) {
+                        $kpiEvents = [...$kpiEvents, ...$interestEvents];
                     }
 
                     $this->entityManager->flush();
@@ -248,6 +259,7 @@ final class AdvanceDayHandler
 
                     if ($migrationEvents !== []) {
                         $emitted = [...$emitted, ...$migrationEvents];
+                        $kpiEvents = [...$kpiEvents, ...$migrationEvents];
                     }
 
                     $this->entityManager->flush();
@@ -307,6 +319,17 @@ final class AdvanceDayHandler
                             ? $this->ensureSettlements($world, $settlementTiles)
                             : [];
                     }
+                }
+
+                if ($this->simulationDailyKpiRecorder instanceof SimulationDailyKpiRecorder) {
+                    $this->simulationDailyKpiRecorder->recordDay(
+                        world: $world,
+                        day: $world->getCurrentDay(),
+                        characters: $characters,
+                        settlements: $settlementEntities,
+                        emittedEvents: $kpiEvents,
+                    );
+                    $this->entityManager->flush();
                 }
             }
 
