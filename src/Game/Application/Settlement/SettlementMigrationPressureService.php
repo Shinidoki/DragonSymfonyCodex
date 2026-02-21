@@ -38,7 +38,7 @@ final class SettlementMigrationPressureService
         $cooldownDays = $catalog->migrationPressureMoveCooldownDays();
         $lookbackDays = $catalog->migrationPressureLookbackDays();
 
-        $latestMigrationDayByCharacterId = $this->latestMigrationDayByCharacterId($world, $characters);
+        $latestMigrationDayByCharacterId = $this->latestMigrationDayByCharacterId($world, $worldDay, $lookbackDays, $characters);
 
         $settlementsByKey = [];
         foreach ($settlements as $settlement) {
@@ -67,7 +67,7 @@ final class SettlementMigrationPressureService
                 continue;
             }
 
-            if ($character->isEmployed() && $character->getEmploymentJobCode() === 'mayor') {
+            if ($character->isEmployed()) {
                 continue;
             }
 
@@ -167,7 +167,7 @@ final class SettlementMigrationPressureService
      *
      * @return array<int,int>
      */
-    private function latestMigrationDayByCharacterId(World $world, array $characters): array
+    private function latestMigrationDayByCharacterId(World $world, int $worldDay, int $lookbackDays, array $characters): array
     {
         $charactersWithIds = array_values(array_filter(
             $characters,
@@ -178,12 +178,27 @@ final class SettlementMigrationPressureService
             return [];
         }
 
+        $lookbackStartDay = max(0, $worldDay - max(0, $lookbackDays));
+
         /** @var list<CharacterEvent> $recent */
-        $recent = $this->entityManager->getRepository(CharacterEvent::class)->findBy([
-            'world' => $world,
-            'character' => $charactersWithIds,
-            'type' => 'settlement_migration_committed',
-        ], ['day' => 'DESC', 'id' => 'DESC']);
+        $recent = $this->entityManager->getRepository(CharacterEvent::class)
+            ->createQueryBuilder('e')
+            ->andWhere('e.world = :world')
+            ->andWhere('e.character IN (:characters)')
+            ->andWhere('e.type = :type')
+            ->andWhere('e.day >= :lookbackStartDay')
+            ->setParameter('world', $world)
+            ->setParameter('characters', $charactersWithIds)
+            ->setParameter('type', 'settlement_migration_committed')
+            ->setParameter('lookbackStartDay', $lookbackStartDay)
+            ->orderBy('e.day', 'DESC')
+            ->addOrderBy('e.id', 'DESC')
+            ->getQuery()
+            ->getResult();
+
+        if (!is_iterable($recent)) {
+            return [];
+        }
 
         $latestByCharacterId = [];
         foreach ($recent as $event) {

@@ -53,7 +53,6 @@ final class SettlementMigrationPressureLoopTest extends KernelTestCase
 
         $migrant = new Character($world, 'Migrant', Race::Human);
         $migrant->setTilePosition(1, 1);
-        $migrant->setEmployment('laborer', 1, 1);
 
         $mayor = new Character($world, 'Mayor', Race::Human);
         $mayor->setTilePosition(1, 1);

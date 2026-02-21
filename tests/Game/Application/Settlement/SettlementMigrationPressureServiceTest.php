@@ -14,6 +14,8 @@ use App\Game\Domain\Economy\EconomyCatalog;
 use App\Game\Domain\Race;
 use Doctrine\ORM\EntityManagerInterface;
 use Doctrine\ORM\EntityRepository;
+use Doctrine\ORM\Query;
+use Doctrine\ORM\QueryBuilder;
 use PHPUnit\Framework\Attributes\AllowMockObjectsWithoutExpectations;
 use PHPUnit\Framework\TestCase;
 
@@ -112,6 +114,38 @@ final class SettlementMigrationPressureServiceTest extends TestCase
         self::assertNotSame([], $events);
     }
 
+    public function testSkipsEmployedCharactersAndUsesDailyCapForUnemployedCandidates(): void
+    {
+        $world = new World('seed-1');
+
+        $source = new Settlement($world, 1, 1);
+        $source->setProsperity(20);
+        $destination = new Settlement($world, 3, 2);
+        $destination->setProsperity(90);
+
+        $employed = new Character($world, 'Employed', Race::Human);
+        $employed->setTilePosition(1, 1);
+        $employed->setEmployment('farmer', 1, 1);
+        $this->setEntityId($employed, 7);
+
+        $unemployed = new Character($world, 'Unemployed', Race::Human);
+        $unemployed->setTilePosition(1, 1);
+        $this->setEntityId($unemployed, 8);
+
+        $service = new SettlementMigrationPressureService(
+            entityManager: $this->mockEntityManager([]),
+            economyCatalogProvider: $this->provider($this->economyCatalog([
+                'daily_move_cap' => 1,
+                'commit_threshold' => 1,
+            ])),
+        );
+
+        $events = $service->advanceDay($world, 10, [$employed, $unemployed], [$source, $destination]);
+
+        self::assertCount(1, $events);
+        self::assertSame(8, $events[0]->getData()['character_id'] ?? null);
+    }
+
     public function testLookbackDaysLimitsCooldownWindow(): void
     {
         $world = new World('seed-1');
@@ -150,11 +184,21 @@ final class SettlementMigrationPressureServiceTest extends TestCase
     /** @param list<CharacterEvent> $recentEvents */
     private function mockEntityManager(array $recentEvents, ?int $expectedFindByCalls = null): EntityManagerInterface
     {
+        $query = $this->createMock(Query::class);
+        $query->method('getResult')->willReturn($recentEvents);
+
+        $queryBuilder = $this->createMock(QueryBuilder::class);
+        $queryBuilder->method('andWhere')->willReturnSelf();
+        $queryBuilder->method('setParameter')->willReturnSelf();
+        $queryBuilder->method('orderBy')->willReturnSelf();
+        $queryBuilder->method('addOrderBy')->willReturnSelf();
+        $queryBuilder->method('getQuery')->willReturn($query);
+
         $eventRepo = $this->createMock(EntityRepository::class);
         if ($expectedFindByCalls !== null) {
-            $eventRepo->expects(self::exactly($expectedFindByCalls))->method('findBy')->willReturn($recentEvents);
+            $eventRepo->expects(self::exactly($expectedFindByCalls))->method('createQueryBuilder')->with('e')->willReturn($queryBuilder);
         } else {
-            $eventRepo->method('findBy')->willReturn($recentEvents);
+            $eventRepo->method('createQueryBuilder')->with('e')->willReturn($queryBuilder);
         }
 
         $em = $this->createMock(EntityManagerInterface::class);
