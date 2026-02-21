@@ -57,6 +57,7 @@ final class AdvanceDayHandler
         private readonly ?TournamentInterestService          $tournamentInterestService = null,
         private readonly ?TournamentDemandFeedbackService    $tournamentDemandFeedbackService = null,
         private readonly ?SettlementMigrationPressureService $settlementMigrationPressureService = null,
+        private readonly ?SimulationDailyKpiRecorder $simulationDailyKpiRecorder = null,
     )
     {
     }
@@ -173,6 +174,14 @@ final class AdvanceDayHandler
                 foreach ($emitted as $event) {
                     $this->entityManager->persist($event);
                 }
+
+                $this->simulationDailyKpiRecorder?->recordDay(
+                    world: $world,
+                    day: $world->getCurrentDay(),
+                    characters: $characters,
+                    settlements: $settlementEntities,
+                    emittedEvents: $emitted,
+                );
 
                 $this->entityManager->flush();
 

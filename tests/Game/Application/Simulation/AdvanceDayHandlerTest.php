@@ -10,6 +10,7 @@ use App\Entity\WorldMapTile;
 use App\Game\Application\Goal\GoalCatalogProviderInterface;
 use App\Game\Application\Simulation\AdvanceDayHandler;
 use App\Game\Application\Settlement\SettlementMigrationPressureService;
+use App\Game\Application\Simulation\SimulationDailyKpiRecorder;
 use App\Game\Application\Tournament\TournamentInterestService;
 use App\Game\Domain\Goal\GoalCatalog;
 use App\Game\Domain\Goal\GoalPlanner;
@@ -450,6 +451,66 @@ final class AdvanceDayHandlerTest extends TestCase
         $firstMigration = $migrationEvents[0];
         self::assertSame(4, $firstMigration->getData()['target_x'] ?? null);
         self::assertSame(0, $firstMigration->getData()['target_y'] ?? null);
+    }
+
+    public function testAdvanceRecordsDailyKpiWhenRecorderConfigured(): void
+    {
+        $world = new World('seed-1');
+        $character = new Character($world, 'Gohan', Race::Human);
+
+        $worldRepository = $this->createMock(WorldRepository::class);
+        $worldRepository->method('find')->with(1)->willReturn($world);
+
+        $characterRepository = $this->createMock(CharacterRepository::class);
+        $characterRepository->method('findBy')->willReturn([$character]);
+
+        $npcProfiles = $this->createMock(NpcProfileRepository::class);
+        $npcProfiles->method('findByWorld')->willReturn([]);
+
+        $tiles = $this->createMock(WorldMapTileRepository::class);
+        $tiles->method('findBy')->willReturn([]);
+
+        $characterGoals = $this->createMock(CharacterGoalRepository::class);
+        $characterGoals->method('findByWorld')->willReturn([]);
+
+        $characterEvents = $this->createMock(CharacterEventRepository::class);
+        $characterEvents->method('findByWorldUpToDay')->willReturn([]);
+
+        $goalProvider = $this->createMock(GoalCatalogProviderInterface::class);
+        $goalProvider->method('get')->willReturn(new GoalCatalog([], [], [], []));
+
+        $persisted = [];
+        $entityManager = $this->createMock(EntityManagerInterface::class);
+        $entityManager->expects(self::atLeastOnce())
+            ->method('persist')
+            ->willReturnCallback(static function (object $entity) use (&$persisted): void {
+                $persisted[] = $entity;
+            });
+        $entityManager->expects(self::once())->method('flush');
+
+        $clock = new SimulationClock(new TrainingGrowthService());
+
+        $recorder = new SimulationDailyKpiRecorder($entityManager);
+
+        $handler = new AdvanceDayHandler(
+            $worldRepository,
+            $characterRepository,
+            $npcProfiles,
+            $tiles,
+            $clock,
+            $entityManager,
+            $characterGoals,
+            $characterEvents,
+            $goalProvider,
+            simulationDailyKpiRecorder: $recorder,
+        );
+
+        $handler->advance(1, 1);
+
+        self::assertTrue((bool) array_filter(
+            $persisted,
+            static fn (object $entity): bool => $entity instanceof \App\Entity\SimulationDailyKpi,
+        ));
     }
 
     private function setEntityId(object $entity, int $id): void
